@@ -1,0 +1,11 @@
+.venv/
+.cache/
+models/
+runs/
+data/raw/
+data/corpus/
+node_modules/
+web/dist/
+*.log
+.env
+data/train/

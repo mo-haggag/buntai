@@ -1,0 +1,10 @@
+# Source before every command: keeps every cache inside the project.
+P="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export UV_CACHE_DIR="$P/.cache/uv"
+export HF_HOME="$P/.cache/hf"
+export npm_config_cache="$P/.cache/npm"
+export TRITON_CACHE_DIR="$P/.cache/triton"
+export TORCHINDUCTOR_CACHE_DIR="$P/.cache/inductor"
+export XDG_CACHE_HOME="$P/.cache"
+export PIP_CACHE_DIR="$P/.cache/pip"
+export PYTHONPYCACHEPREFIX="$P/.cache/pycache"
