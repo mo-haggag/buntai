@@ -159,6 +159,8 @@ def main() -> None:
 
     stats = {
         "voice": a.voice, "posts": len(posts), "posts_kept": len(kept),
+        "kept_posts": [{"title": p["title"], "url": p["url"], "words": len(p["text"].split())} for p in kept],
+        "dropped_posts": [{"title": p["title"], "url": p["url"], "words": len(p["text"].split())} for p in posts if is_transcript(p)],
         "passages": len(built), "train": counts["train"], "eval": counts["eval"],
         "train_words": sum(len(it["passage"].split()) for it in built if it["split"] == "train"),
         "instruction_model": a.model,
