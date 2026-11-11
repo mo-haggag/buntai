@@ -11,7 +11,16 @@ Demo voice: Garry Tan, from the 388 posts on [blog.garrytan.com](https://blog.ga
 
 ## Results
 
-RESULTS_TABLE
+Garry Tan voice, trained on this laptop (RTX 5090 Laptop GPU, 24 GB) in 3 minutes 16 seconds:
+
+| | Base Qwen3-VL-4B | GPT-5.5 asked to imitate him | ownvoice (tuned 4B) |
+|---|---|---|---|
+| Blind judge picks the closest voice to his real passage (20 held-out requests, each judged twice) | 0 of 40 | 13 of 40 | **27 of 40** |
+| Perplexity of his real held-out passages (lower = closer) | 19.15 | n/a | **10.79** (44% lower) |
+
+- Corpus: 388 posts, 161,000 words. 16 interview and podcast posts dropped. 381 training pairs, 33 held-out pairs from posts the model never saw.
+- Adapter: 33M parameters (0.74% of the model), LoRA rank 16, 2 epochs, 96 steps.
+- GPT-5.5 sometimes opened with a disclaimer that it can't write in his exact style. With a rented model, the provider decides what it will imitate.
 
 ## How it works
 

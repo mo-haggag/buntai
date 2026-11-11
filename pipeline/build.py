@@ -1,8 +1,9 @@
 """Turn a corpus into instruction -> passage training pairs (instruction back-translation).
 
-Each post is split into passages at paragraph boundaries. An LLM writes the request a
-user would give to get a passage with that content (topic, points, examples, length),
-never its wording. The model is then trained to answer the request with the author's
+Each post is split into passages at paragraph boundaries. An LLM writes two requests a
+user could give to get a passage with that content: a detailed one (topic, points,
+examples, length) and a one-line one, as people type in a chat box. Never its wording.
+Training uses both; evaluation uses the detailed one. The model is then trained to answer the request with the author's
 real passage, so everything it learns about phrasing comes from the author.
 
 Posts are split into train and eval by a hash of their URL, so no eval passage shares
@@ -28,14 +29,17 @@ ROOT = Path(__file__).resolve().parent.parent
 
 INSTRUCTION_PROMPT = """You are building a writing dataset. Below is a passage from a blog post titled "{title}".
 
-Write the request a person would give a writer to get a passage with the same content. Say what to cover: the topic, the points made, any story, example or advice in it, and the length (about {words} words). Do not describe the style or tone, do not name the author, and do not reuse distinctive phrases from the passage. Write one to three sentences in the imperative, as the person would type it.
+Write two requests a person could give a writer to get a passage with the same content:
+- "long": say what to cover: the topic, the points made, any story, example or advice in it, and the length (about {words} words). One to three sentences in the imperative.
+- "short": the way someone would casually type it into a chat box, 6 to 20 words, naming only the topic or angle (for example "Write a short post on why founders should talk to users every week").
+In both: do not describe the style or tone, do not name the author, and do not reuse distinctive phrases from the passage.
 
 Passage:
 \"\"\"
 {passage}
 \"\"\"
 
-Reply with the request only."""
+Reply with JSON only: {{"long": "...", "short": "..."}}"""
 
 TRANSCRIPT_TITLE = re.compile(r"(?i)\b(conversation with|interview|podcast|episode|transcript|q&a|ama)\b")
 SPEAKER_LINE = re.compile(r"^[A-Z][A-Za-z .'-]{1,30}:\s")
@@ -116,8 +120,10 @@ def main() -> None:
 
     def one(it: dict) -> dict | None:
         try:
-            it["instruction"] = openai_chat(INSTRUCTION_PROMPT.format(
+            raw = openai_chat(INSTRUCTION_PROMPT.format(
                 title=it["title"], words=round(len(it["passage"].split()), -1), passage=it["passage"]), a.model)
+            req = json.loads(raw[raw.find("{"): raw.rfind("}") + 1])
+            it["instruction"], it["short"] = req["long"].strip(), req["short"].strip()
         except Exception as e:
             print("skip passage: %s" % e, file=sys.stderr)
             return None
@@ -143,6 +149,11 @@ def main() -> None:
         }
         files[it["split"]].write(json.dumps(rec, ensure_ascii=False) + "\n")
         counts[it["split"]] += 1
+        if it["split"] == "train" and it.get("short"):
+            # The same passage behind a one-line request, the way people type in a chat box.
+            short = {**rec, "messages": [{"role": "user", "content": it["short"]}, rec["messages"][1]]}
+            files["train"].write(json.dumps(short, ensure_ascii=False) + "\n")
+            counts["train"] += 1
     for f in files.values():
         f.close()
 

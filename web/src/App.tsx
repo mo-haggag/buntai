@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { AudioLines, CircleAlert, Laptop, Mic, Monitor, Moon, PenLine, Scale, Sun } from "lucide-react";
+import { BookOpenText, CircleAlert, Feather, Laptop, Monitor, Moon, PenLine, Scale, Sun } from "lucide-react";
 import { api, isMock } from "./api";
 import type { Voice } from "./api";
 import { useTheme } from "./theme";
@@ -41,7 +41,7 @@ function useRoute() {
 }
 
 const TABS: { tab: Tab; label: string; icon: ReactNode }[] = [
-  { tab: "voices", label: "Voices", icon: <Mic className="size-4" aria-hidden /> },
+  { tab: "voices", label: "Voices", icon: <BookOpenText className="size-4" aria-hidden /> },
   { tab: "write", label: "Write", icon: <PenLine className="size-4" aria-hidden /> },
   { tab: "blind", label: "Blind test", icon: <Scale className="size-4" aria-hidden /> },
 ];
@@ -90,7 +90,7 @@ export default function App() {
         <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-4 sm:px-6">
           <a href="#/voices" className="flex items-center gap-2 font-semibold tracking-tight">
             <span className="flex size-7 items-center justify-center rounded-lg bg-accent text-white">
-              <AudioLines className="size-4" aria-hidden />
+              <Feather className="size-4" aria-hidden />
             </span>
             ownvoice
           </a>

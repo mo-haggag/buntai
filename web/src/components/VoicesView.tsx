@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { ArrowRight, ChevronRight, Mic, Plus, X } from "lucide-react";
+import { ArrowRight, BookOpenText, ChevronRight, Plus, X } from "lucide-react";
 import { api } from "../api";
 import type { Voice } from "../api";
 import { Button, Card, EmptyState, Progress, StageBadge, cx, fmtCompact, hostOf, isRunning } from "./ui";
@@ -41,7 +41,7 @@ export function VoicesView({
       )}
 
       {loaded && voices.length === 0 && !formOpen && (
-        <EmptyState icon={<Mic className="size-6" />} title="No voices yet">
+        <EmptyState icon={<BookOpenText className="size-6" />} title="No voices yet">
           Add a blog to train a voice.
         </EmptyState>
       )}
