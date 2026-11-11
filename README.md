@@ -17,12 +17,14 @@ Trained on one laptop (RTX 5090 Laptop GPU, 24 GB). "Judge" is a blind test: for
 |---|---|---|---|---|---|
 | Garry Tan | 386 posts, 161K words, 762 pairs | 0 / 14 / **26** | 18.9 to **11.5** (39% lower) | 2 of 2 | 5 min 45 s |
 | Sam Altman | 121 posts, 113K words, 478 pairs | 0 / **28** / 12 | 17.9 to **10.0** (44% lower) | 1 of 4 | 8 min 27 s |
-| Paul Graham | PG_ROW |
+| Paul Graham | 231 essays, 576K words, 1,056 pairs (600 of 1,647 passages sampled) | 0 / **36** / 4 | 16.9 to **8.7** (48% lower) | 1 of 4 | 19 min 2 s |
 
 How to read it:
 
 - **Garry Tan:** the owned 4B beat GPT-5.5 about 2 to 1 on voice, with a judge from GPT's own family. His style is idiosyncratic (link posts, "Picture this…", first-person asides), which is where an adapter has the most to add.
 - **Sam Altman:** GPT-5.5 won. His prose is plain and analytical, a register GPT-5.5 already writes well, and the best epoch was epoch 1, only 60 optimizer steps on 478 pairs. Later epochs memorised the data (held-out perplexity 9.96, 11.68, 15.32, 17.54 after epochs 1 to 4), so the trainer kept epoch 1. More data or a lower learning rate is the next step for small corpora.
+- **Paul Graham:** GPT-5.5 won 36 of 40. Same pattern as Sam, stronger: a famous, plain-spoken essayist whose work the frontier model has read in full, and a run whose best epoch was again epoch 1 (perplexity after epochs 1 to 4: 8.71, 10.06, 12.74, 15.02).
+- **What the three runs say together.** The adapter always learns the author (perplexity down 39% to 48%, the base model never wins). Against a frontier model told to imitate the author, it wins when the style is idiosyncratic and loses when the author is famous and plain. Epoch 1 was best in all three runs at this learning rate, so the next change is a lower rate with more steps, and letting the judge pick the checkpoint (`evaluate.py --checkpoints`).
 - **The base model never wins.** Untrained Qwen3-VL-4B writes with bold headers, emoji bullets and hashtags; neither judge nor perplexity ever prefers it.
 
 What keeps the numbers honest:
