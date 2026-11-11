@@ -105,7 +105,7 @@ def main() -> None:
         ids, labels = train[order.pop()]
         out = model(input_ids=torch.tensor([ids], device="cuda"), labels=torch.tensor([labels], device="cuda"))
         (out.loss / a.accum).backward()
-        run_loss += float(out.loss)
+        run_loss += out.loss.detach().item()
         run_n += 1
         micro += 1
         if micro % a.accum:
