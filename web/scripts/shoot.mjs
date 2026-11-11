@@ -1,13 +1,20 @@
-// Minimal CDP driver: node shoot.mjs <outdir> <scheme>
+// Minimal CDP driver: node shoot.mjs <outdir> <scheme> [baseUrl] [shotNames]
+// Screens: 1-styles, 2-overview, 3-data, 4-training, 5-evaluation, 6-write, 7-new (comma-separated in shotNames).
 import { spawn } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const [outDir, scheme = "light", base = "http://127.0.0.1:5175/?mock=1", only = ""] = process.argv.slice(2);
 const want = only ? only.split(",") : null;
 const prefix = base.includes("mock=1") ? "" : "real-";
+const style = process.env.STYLE_ID || "garry";
 const port = 9333;
+const profile = resolve(dirname(fileURLToPath(import.meta.url)), "../../.cache/chrome-profile"); // inside the project
+mkdirSync(profile, { recursive: true });
+mkdirSync(outDir, { recursive: true });
 const chrome = spawn("google-chrome", [
-  "--headless=new", `--remote-debugging-port=${port}`, "--user-data-dir=/tmp/ownvoice-shots/profile",
+  "--headless=new", `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`,
   "--no-first-run", "--hide-scrollbars", "--window-size=1440,1000", "about:blank",
 ], { stdio: "ignore" });
 
@@ -32,7 +39,7 @@ await send("Page.enable");
 await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: scheme }] });
 await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
 
-async function shot(name, hash, actions = async () => {}, wait = 1500) {
+async function shot(name, hash, actions = async () => {}, wait = 1800) {
   if (want && !want.includes(name)) return;
   await send("Page.navigate", { url: `${base}${hash}` });
   await sleep(wait);
@@ -49,10 +56,15 @@ async function shot(name, hash, actions = async () => {}, wait = 1500) {
 
 const click = (sel, text) => evalJs(`(() => { const els = [...document.querySelectorAll(${JSON.stringify(sel)})].filter(e => e.offsetParent !== null); const el = els.find(e => e.textContent.trim().includes(${JSON.stringify(text)})); if (el) el.click(); return !!el; })()`);
 
-await shot("1-voices", "#/voices");
-await shot("2-voice-garry", "#/voices/garry");
-await shot("3-voice-training", "#/voices/pg");
-await shot("4-write", "#/write", async () => {
+await shot("1-styles", "#/styles");
+await shot("2-overview", `#/styles/${style}/overview`);
+await shot("3-data", `#/styles/${style}/data`);
+await shot("4-training", `#/styles/${style}/training`);
+await shot("5-evaluation", `#/styles/${style}/evaluation`, async () => {
+  await click("button", "Pick A");
+  await sleep(400);
+});
+await shot("6-write", "#/write", async () => {
   await click("button", "Talk to users weekly");
   await sleep(100);
   await click("[role=switch]", "GPT-5.5");
@@ -60,24 +72,9 @@ await shot("4-write", "#/write", async () => {
   await click("button", "Generate");
   await sleep(Number(process.env.WRITE_WAIT || 6500));
 });
-await shot("5-blind", "#/blind", async () => {});
-await shot("6-blind-revealed", "#/blind", async () => {
-  await click("button", "Pick A");
-  await sleep(400);
-});
-
-await shot("7-new-voice", "#/voices", async () => {
-  await click("button", "New voice");
+await shot("7-new", "#/new", async () => {
+  await click("button", "Upload files");
   await sleep(200);
-  await evalJs(`(() => {
-    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
-    const [a, b] = document.querySelectorAll("form input");
-    set.call(a, "Sam Altman"); a.dispatchEvent(new Event("input", { bubbles: true }));
-    set.call(b, "blog.samaltman.com"); b.dispatchEvent(new Event("input", { bubbles: true }));
-  })()`);
-  await sleep(100);
-  await click("button", "Create voice");
-  await sleep(4000);
 });
 
 ws.close();
