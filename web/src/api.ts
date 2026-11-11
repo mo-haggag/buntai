@@ -117,6 +117,7 @@ export interface MachineModel {
   fits_training: boolean;
   fits_serving: boolean;
   recommended: boolean;
+  typical_style_minutes: number | null;
   download: { state: "running" | "done" | "error"; downloaded_gb: number; started: number } | null;
 }
 
@@ -124,6 +125,10 @@ export interface Machine {
   gpu: { name: string; vram_total_mb: number; vram_used_mb: number; util: number; temp_c: number; power_w: number } | null;
   busy: string | null;
   busy_name?: string | null;
+  busy_stage?: string | null;
+  busy_progress?: Voice["progress"] | null;
+  ram?: { total_gb: number; available_gb: number } | null;
+  styles_on_disk?: { adapters: number; adapters_gb: number; checkpoints_gb: number; corpora_mb: number };
   model_loaded: boolean;
   base_model: string;
   disk: { project_free_gb: number; project_total_gb: number; models_free_gb: number; models_total_gb: number };

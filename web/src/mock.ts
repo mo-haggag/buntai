@@ -277,12 +277,13 @@ export const mockApi: Api = {
     await sleep(80);
     return {
       gpu: { name: "NVIDIA GeForce RTX 5090 Laptop GPU", vram_total_mb: 24463, vram_used_mb: 9343, util: 12, temp_c: 48, power_w: 41.2 },
-      busy: null, model_loaded: true, base_model: "qwen3vl-4b",
+      busy: null, model_loaded: true, base_model: "qwen3vl-4b", ram: { total_gb: 64.0, available_gb: 38.2 },
+      styles_on_disk: { adapters: 3, adapters_gb: 0.4, checkpoints_gb: 1.2, corpora_mb: 9 },
       disk: { project_free_gb: 31.6, project_total_gb: 32.7, models_free_gb: 962, models_total_gb: 1700 },
       models: [
-        { id: "qwen3vl-2b", repo: "Qwen/Qwen3-VL-2B-Instruct", params: "2B", size_gb: 4.4, train_vram_gb: 9, serve_vram_gb: 5, present: false, active: false, size_on_disk_gb: 0, fits_training: true, fits_serving: true, recommended: false, download: null },
-        { id: "qwen3vl-4b", repo: "Qwen/Qwen3-VL-4B-Instruct", params: "4B", size_gb: 8.9, train_vram_gb: 15, serve_vram_gb: 9, present: true, active: true, size_on_disk_gb: 8.9, fits_training: true, fits_serving: true, recommended: true, download: null },
-        { id: "qwen3vl-8b", repo: "Qwen/Qwen3-VL-8B-Instruct", params: "8B", size_gb: 17, train_vram_gb: 23, serve_vram_gb: 17, present: false, active: false, size_on_disk_gb: 0, fits_training: false, fits_serving: true, recommended: false, download: null },
+        { id: "qwen3vl-2b", repo: "Qwen/Qwen3-VL-2B-Instruct", params: "2B", size_gb: 4.4, train_vram_gb: 9, serve_vram_gb: 5, present: false, active: false, size_on_disk_gb: 0, fits_training: true, fits_serving: true, recommended: false, typical_style_minutes: 6, download: null },
+        { id: "qwen3vl-4b", repo: "Qwen/Qwen3-VL-4B-Instruct", params: "4B", size_gb: 8.9, train_vram_gb: 15, serve_vram_gb: 9, present: true, active: true, size_on_disk_gb: 8.9, fits_training: true, fits_serving: true, recommended: true, typical_style_minutes: 12, download: null },
+        { id: "qwen3vl-8b", repo: "Qwen/Qwen3-VL-8B-Instruct", params: "8B", size_gb: 17, train_vram_gb: 23, serve_vram_gb: 17, present: false, active: false, size_on_disk_gb: 0, fits_training: false, fits_serving: true, recommended: false, typical_style_minutes: 24, download: null },
       ],
     };
   },

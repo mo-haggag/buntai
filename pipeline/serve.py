@@ -663,10 +663,41 @@ def dir_size(p: Path) -> int:
     return total
 
 
+def ram_info() -> dict | None:
+    try:
+        kv = {}
+        for line in open("/proc/meminfo"):
+            k, rest = line.split(":", 1)
+            kv[k] = int(rest.strip().split()[0]) * 1024
+        return {"total_gb": round(kv["MemTotal"] / 1e9, 1), "available_gb": round(kv["MemAvailable"] / 1e9, 1)}
+    except Exception:
+        return None
+
+
+def measured_rate() -> float | None:
+    """Seconds per (training pair x epoch) on this machine, from the most recent finished runs of the active model."""
+    rates = []
+    for vdir in (RUNS).glob("*/runs/*/"):
+        m = read_json(vdir / "metrics.json", {}) or {}
+        if m.get("train_seconds") and m.get("train_pairs") and m.get("epochs"):
+            rates.append(m["train_seconds"] / (m["train_pairs"] * m["epochs"]))
+    return sum(rates) / len(rates) if rates else None
+
+
 def machine_view() -> dict:
     import shutil
     gpu_ = gpu_info()
     vram = (gpu_ or {}).get("vram_total_mb", 0) / 1024
+    rate = measured_rate()
+    active_params = next((float(m["params"].rstrip("B")) for m in CATALOG if m["id"] == MODEL_DIR.name), 4.0)
+    busy_stage, busy_progress = None, None
+    if gpu.busy:
+        busy_stage = (read_json(RUNS / gpu.busy / "stage.json", {}) or {}).get("stage")
+        busy_progress = progress.get(gpu.busy)
+    adapters = [p for p in RUNS.glob("*/runs/*/adapter/adapter_model.safetensors")]
+    styles_on_disk = {"adapters": len(adapters), "adapters_gb": round(sum(os.path.getsize(p) for p in adapters) / 1e9, 2),
+                      "checkpoints_gb": round(sum(os.path.getsize(p) for p in RUNS.glob("*/runs/*/checkpoints/*/adapter_model.safetensors")) / 1e9, 2),
+                      "corpora_mb": round(dir_size(DATA) / 1e6) if DATA.exists() else 0}
     models_dir = ROOT / "models"
     models_dir.mkdir(exist_ok=True)
     fits = [m for m in CATALOG if m["train_vram_gb"] <= vram * 0.85]
@@ -682,7 +713,8 @@ def machine_view() -> dict:
             status = {"state": "running" if rc is None else ("done" if rc == 0 else "error"),
                       "downloaded_gb": round(dir_size(d) / 1e9, 2) if d.exists() else 0,
                       "started": job["started"]}
-        rows.append({**m, "present": present, "active": m["id"] == MODEL_DIR.name,
+        est_min = round(rate * 600 * 4 * (float(m["params"].rstrip("B")) / active_params) / 60) if rate else None
+        rows.append({**m, "present": present, "active": m["id"] == MODEL_DIR.name, "typical_style_minutes": est_min,
                      "size_on_disk_gb": round(dir_size(d) / 1e9, 2) if d.exists() else 0,
                      "fits_training": m["train_vram_gb"] <= vram * 0.85, "fits_serving": m["serve_vram_gb"] <= vram * 0.9,
                      "recommended": m["id"] == recommended, "download": status})
@@ -691,8 +723,10 @@ def machine_view() -> dict:
     disk_models = shutil.disk_usage(real_models.resolve().parent if real_models.exists() else models_dir)
     names = {k: m.get("name", k) for k, m in load_voices().items()}
     return {
-        "gpu": gpu_, "busy": gpu.busy, "busy_name": names.get(gpu.busy, gpu.busy) if gpu.busy else None,
-        "model_loaded": gpu.model is not None, "base_model": MODEL_DIR.name,
+        "gpu": gpu_, "ram": ram_info(), "busy": gpu.busy, "busy_name": names.get(gpu.busy, gpu.busy) if gpu.busy else None,
+        "busy_stage": busy_stage, "busy_progress": busy_progress,
+        "model_loaded": gpu.model is not None, "base_model": MODEL_DIR.name, "styles_on_disk": styles_on_disk,
+        "measured_rate_s_per_pair_epoch": round(rate, 3) if rate else None,
         "disk": {"project_free_gb": round(disk_project.free / 1e9, 1), "project_total_gb": round(disk_project.total / 1e9, 1),
                  "models_free_gb": round(disk_models.free / 1e9, 1), "models_total_gb": round(disk_models.total / 1e9, 1)},
         "models": rows,
