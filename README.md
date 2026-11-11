@@ -30,12 +30,12 @@ What keeps the numbers honest:
 - **Held-out by post.** Train and eval are split by a hash of the post URL, so no evaluated passage shares a post with a training passage.
 - **The model learns phrasing only from the author.** An LLM writes the requests (what to cover, how long), so everything stylistic in the targets is the author's. Interviews, transcripts and show notes are cut out first.
 - **The judge is biased against us.** gpt-5.4 is from the same family as the GPT-5.5 competitor, and models tend to prefer their own family's writing.
-- **The best epoch is kept.** Held-out perplexity is measured after every epoch and the adapter from the best one is saved, so more epochs cannot make the result worse.
+- **The best epoch is kept.** Held-out perplexity is measured after every epoch and the adapter from the best one is saved, so more epochs cannot make the result worse. Every epoch's adapter stays on disk as a checkpoint, and `evaluate.py --checkpoints` lets the judge pick among them instead, for the cases where perplexity and voice disagree (Sam Altman's run is one).
 - **It learns how someone writes, not what is true.** A 4B model invents facts and anecdotes in the author's voice.
 
 ## The app
 
-Two modes, because there are two jobs: writing with a style, and making one.
+Two modes, because there are two jobs: writing with a style, and making one. The first screen asks which you want.
 
 **Use**
 
@@ -43,7 +43,7 @@ Two modes, because there are two jobs: writing with a style, and making one.
 
 **Train**
 
-- **Styles.** One page per style with four tabs. *Overview*: the pipeline and the headline numbers. *Data*: the posts used and dropped, the passages with their generated requests, an Exclude button per post, then "Rebuild and retrain". *Training*: every run with its loss curve, the held-out perplexity after each epoch, and "Use this run" to switch adapters. *Evaluation*: perplexity, the judge result, a blind test you take yourself, and every judged sample with all three outputs.
+- **Styles.** One page per style with four tabs. *Overview*: the pipeline and the headline numbers. *Data*: the posts used and dropped, the passages with their generated requests, an Exclude button per post, then "Rebuild and retrain". *Training*: every run with its loss curve, the held-out perplexity after each epoch, and "Use this run" to switch adapters. *Evaluation*: perplexity, the judge result, a blind test you take yourself, and every judged sample with all three outputs. A ready style also offers **Add writing** (more files, text or a URL, then train again), **Continue training** (resume from the current adapter at a lower learning rate) and **Retrain**.
 - **New style.** A name and the writing: a blog URL (Posthaven, Substack, WordPress, Ghost, or any site with a sitemap or feed), uploaded .txt/.md/.docx files, or pasted text. Everything else runs on its own.
 - **Benchmark.** One prompt written by the base model, one or two styles, and GPT-5.5 imitating the author, side by side as they stream.
 - **Machine.** The GPU and its memory, free disk, which base models are on disk and which is active, what training and serving each needs, and a download button for the ones that fit this GPU.

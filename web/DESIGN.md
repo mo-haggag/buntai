@@ -26,7 +26,7 @@ System font stack. Sizes used: 12px (`text-xs`) for labels and metadata, 14px (`
 
 ## Shell
 
-A side rail with two groups, Use (Write) and Train (Styles, New style, Benchmark, Machine). Use screens show one output and no numbers. Train screens show comparisons, numbers and the machine. Nothing from one group appears in the other.
+A side rail with Start at the top, then two groups: Use (Write) and Train (New style, Styles, Benchmark, Machine). Start asks what you want to do; it is the only screen with no nav group. Use screens show one output and no numbers. Train screens show comparisons, numbers and the machine. Nothing from one group appears in the other.
 
 ## Rules
 
