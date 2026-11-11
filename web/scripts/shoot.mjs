@@ -73,6 +73,7 @@ await shot("6-benchmark", "#/benchmark", async () => {
   await sleep(Number(process.env.WRITE_WAIT || 6500));
 });
 await shot("0-write", "#/write", async () => {
+  await sleep(Number(process.env.PRE_WAIT || 0)); // mock mode: let the simulated training finish first
   await evalJs(`(() => {
     const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
     const ta = document.querySelector("textarea");

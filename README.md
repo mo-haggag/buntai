@@ -25,11 +25,18 @@ What keeps the numbers honest:
 
 ## The app
 
-A side-menu app with three sections:
+Two modes, because there are two jobs: writing with a style, and making one.
 
-- **Write.** One prompt, written by the base model, one or two trained styles, and GPT-5.5 imitating the author, side by side as they stream.
-- **Styles.** One page per style with four tabs. *Overview*: the pipeline and the headline numbers. *Data*: the posts used and dropped, the passages with their generated requests, and an Exclude button per post, then "Rebuild and retrain". *Training*: every run with its loss curve, the held-out perplexity after each epoch, and "Use this run" to switch adapters. *Evaluation*: perplexity, the judge result, a blind test you take yourself, and every judged sample with all three outputs.
+**Use**
+
+- **Write.** Pick a style, say what to write (and paste notes or a draft to work from), choose a length. The draft streams in and renders as markdown. Edit it in place, copy it, write it again. Recent drafts are kept. No comparisons, no numbers: a writing tool.
+
+**Train**
+
+- **Styles.** One page per style with four tabs. *Overview*: the pipeline and the headline numbers. *Data*: the posts used and dropped, the passages with their generated requests, an Exclude button per post, then "Rebuild and retrain". *Training*: every run with its loss curve, the held-out perplexity after each epoch, and "Use this run" to switch adapters. *Evaluation*: perplexity, the judge result, a blind test you take yourself, and every judged sample with all three outputs.
 - **New style.** A name and the writing: a blog URL (Posthaven, Substack, WordPress, Ghost, or any site with a sitemap or feed), uploaded .txt/.md/.docx files, or pasted text. Everything else runs on its own.
+- **Benchmark.** One prompt written by the base model, one or two styles, and GPT-5.5 imitating the author, side by side as they stream.
+- **Machine.** The GPU and its memory, free disk, which base models are on disk and which is active, what training and serving each needs, and a download button for the ones that fit this GPU.
 
 `web/DESIGN.md` describes the tokens and primitives the screens are built from.
 
