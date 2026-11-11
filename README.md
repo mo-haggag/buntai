@@ -7,19 +7,22 @@ Built in one evening at c0mpiled-18 (YC Startup School hackathon, Taipei) agains
 - **LLMs That Write Well** (Jared Friedman): frontier models write in one flat house voice. ownvoice gives you a model that writes in a specific person's voice.
 - **Own Your Intelligence** (Jon Xu): turn expertise into training data and own the model. The voice lives in a 33M-parameter adapter on your disk, on top of a 4B open-weights model that runs on a laptop.
 
+It learns how someone writes, not what is true: a 4B model will invent facts and anecdotes in the author's voice.
+
 Demo voice: Garry Tan, from the 388 posts on [blog.garrytan.com](https://blog.garrytan.com).
 
 ## Results
 
-Garry Tan voice, trained on this laptop (RTX 5090 Laptop GPU, 24 GB) in 3 minutes 16 seconds:
+Garry Tan voice, trained on this laptop (RTX 5090 Laptop GPU, 24 GB) in 5 minutes 45 seconds:
 
 | | Base Qwen3-VL-4B | GPT-5.5 asked to imitate him | ownvoice (tuned 4B) |
 |---|---|---|---|
-| Blind judge picks the closest voice to his real passage (20 held-out requests, each judged twice) | 0 of 40 | 13 of 40 | **27 of 40** |
-| Perplexity of his real held-out passages (lower = closer) | 19.15 | n/a | **10.79** (44% lower) |
+| Blind judge picks the closest voice to his real passage (20 held-out requests, each judged twice) | 0 of 40 | 14 of 40 | **26 of 40** |
+| Perplexity of his real held-out passages (lower = closer) | 18.94 | n/a | **11.51** (39% lower) |
 
-- Corpus: 388 posts, 161,000 words. 16 interview and podcast posts dropped. 381 training pairs, 33 held-out pairs from posts the model never saw.
-- Adapter: 33M parameters (0.74% of the model), LoRA rank 16, 2 epochs, 96 steps.
+- Corpus: 388 posts, 161,000 words. 16 interview and podcast posts dropped. 381 passages for training, each paired with a detailed request and a one-line request (762 pairs), and 33 held-out passages from posts the model never saw.
+- Adapter: 33M parameters (0.74% of the model), LoRA rank 16, 2 epochs, 191 steps.
+- The first run trained on detailed requests only: judge 27 / 13 / 0, perplexity 44% lower. The one-line requests were added because people type short prompts; the judge result held.
 - GPT-5.5 sometimes opened with a disclaimer that it can't write in his exact style. With a rented model, the provider decides what it will imitate.
 
 ## How it works
