@@ -276,7 +276,8 @@ async def run_pipeline(vid: str, skip: tuple[str, ...] = ()) -> None:
             if stage == "train":
                 training_run[vid] = rid
             proc = await asyncio.create_subprocess_exec(*cmd, cwd=str(ROOT), stdout=asyncio.subprocess.PIPE,
-                                                        stderr=asyncio.subprocess.STDOUT, env=os.environ.copy())
+                                                        stderr=asyncio.subprocess.STDOUT, env=os.environ.copy(),
+                                                        limit=4 * 1024 * 1024)  # a stats line can be long
             last = ""
             assert proc.stdout
             async for raw in proc.stdout:
@@ -298,6 +299,9 @@ async def run_pipeline(vid: str, skip: tuple[str, ...] = ()) -> None:
             if stage == "train":
                 training_run.pop(vid, None)
         set_stage(vid, "ready")
+    except Exception as e:  # the runner itself failed: say so instead of leaving the stage stuck
+        set_stage(vid, "error", "runner failed: %s" % e)
+        logf.write("[runner] %s\n" % e)
     finally:
         training_run.pop(vid, None)
         if held_jobs:

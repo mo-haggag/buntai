@@ -215,7 +215,7 @@ def main() -> None:
         "instruction_model": a.model,
     }
     (run / "build.json").write_text(json.dumps(stats, indent=1))
-    print(json.dumps(stats))
+    print(json.dumps({k: v for k, v in stats.items() if k not in ("kept_posts", "dropped_posts")}))
 
 
 if __name__ == "__main__":
