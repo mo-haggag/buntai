@@ -245,6 +245,7 @@ PROGRESS_PATTERNS = [
     (re.compile(r"step (\d+)/(\d+)"), lambda m: {"label": "Training", "done": int(m.group(1)), "total": int(m.group(2))}),
     (re.compile(r"epoch (\d+): held-out perplexity ([\d.]+)"), lambda m: {"label": "Epoch %s checked" % m.group(1), "done": 0, "total": 0}),
     (re.compile(r"generated (\d+)/(\d+)"), lambda m: {"label": "Writing samples", "done": int(m.group(1)), "total": int(m.group(2))}),
+    (re.compile(r"checkpoint (epoch-\d+) fooled the judge (\d+)/(\d+)"), lambda m: {"label": "Judging %s: fooled %s of %s" % (m.group(1), m.group(2), m.group(3)), "done": 0, "total": 0}),
     (re.compile(r"held-out perplexity, base"), lambda m: {"label": "Measuring base", "done": 0, "total": 0}),
 ]
 
@@ -260,17 +261,21 @@ def collect_cmd(vid: str, meta: dict) -> list[str]:
     return cmd
 
 
-async def run_pipeline(vid: str, skip: tuple[str, ...] = (), continue_from: str | None = None) -> None:
+async def run_pipeline(vid: str, skip: tuple[str, ...] = (), continue_from: str | None = None,
+                       checkpoints: bool = False) -> None:
     meta = load_voices()[vid]
     rid = time.strftime("%Y%m%d-%H%M%S")
     train_cmd = [PY, "pipeline/train.py", "--voice", vid, "--run-id", rid]
     if continue_from:  # resume the current adapter: fewer epochs, a gentler learning rate
         train_cmd += ["--from-run", continue_from, "--epochs", "2", "--lr", "1e-4"]
+    eval_cmd = [PY, "pipeline/evaluate.py", "--voice", vid, "--name", meta["name"]]
+    if checkpoints:  # the judge tests every saved epoch and promotes the one it prefers before the full evaluation
+        eval_cmd.append("--checkpoints")
     steps = [
         ("collect", collect_cmd(vid, meta)),
         ("build", [PY, "pipeline/build.py", "--voice", vid]),
         ("train", train_cmd),
-        ("eval", [PY, "pipeline/evaluate.py", "--voice", vid, "--name", meta["name"]]),
+        ("eval", eval_cmd),
     ]
     running.add(vid)
     (RUNS / vid).mkdir(parents=True, exist_ok=True)
@@ -427,8 +432,9 @@ async def rerun(req: web.Request) -> web.Response:
     cont = active_run(vid) if body.get("continue") else None
     if body.get("continue") and not cont:
         return web.json_response({"error": "nothing to continue from"}, status=400)
-    tasks[vid] = asyncio.get_event_loop().create_task(run_pipeline(vid, tuple(order[: order.index(start)]), cont))
-    return web.json_response({"id": vid, "from": start, "continue_from": cont})
+    tasks[vid] = asyncio.get_event_loop().create_task(
+        run_pipeline(vid, tuple(order[: order.index(start)]), cont, bool(body.get("checkpoints"))))
+    return web.json_response({"id": vid, "from": start, "continue_from": cont, "checkpoints": bool(body.get("checkpoints"))})
 
 
 @routes.post("/api/jobs/{id}/cancel")

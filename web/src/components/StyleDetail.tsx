@@ -387,7 +387,8 @@ function DataTab({ voice }: { voice: Voice }) {
 /* ---------- Training ---------- */
 
 function TrainingTab({ voice, onUpdate }: { voice: Voice; onUpdate: (v: Voice) => void }) {
-  const runs = voice.runs ?? [];
+  // A run that was interrupted before it saved anything is noise here.
+  const runs = (voice.runs ?? []).filter((r) => r.has_adapter || r.metrics.ppl_tuned !== undefined || r.id === voice.train?.run);
   const [busy, setBusy] = useState<string | null>(null);
   const t = voice.train;
 
