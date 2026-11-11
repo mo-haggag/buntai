@@ -75,7 +75,7 @@ Two jobs, two modes. The first screen asks which you want. The side menu has one
 
 ![Style data](docs/screenshots/style-data.png)
 
-*Training* lists every run with its loss curve and the held-out perplexity after each epoch, marks the epoch kept, and has Continue training (two more epochs from the current adapter at a lower learning rate), Train again, and Use this run to switch the adapter a style writes with.
+*Training* lists every run with its loss curve and the held-out perplexity after each epoch, marks the epoch kept, and has Continue training (two more epochs from the current adapter at a lower learning rate), Train again (a fresh run in which the judge picks the epoch), Use this run to switch the adapter a style writes with, and Delete run. A style itself is deleted from its page, which removes its runs, adapters, checkpoints, collected writing and pairs.
 
 ![Style training](docs/screenshots/style-training.png)
 

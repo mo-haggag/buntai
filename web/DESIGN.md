@@ -50,6 +50,7 @@ One family (lucide), one stroke weight. Sizes: 16 px (`size-4`) in the rail, but
 | Edit text | `TextCursor` | the draft toolbar (never a pen: pens mean Write) |
 | Copy, Again, Stop, Done | `Copy`, `RotateCcw`, `Square`, `Check` | the draft toolbar |
 | Disk, base models | `HardDrive`, `Package` | Machine |
+| Delete | `Trash2` | a style, a run |
 | State | `Check`, `CircleAlert`, `LoaderCircle` | badges and steps |
 
 ## Rules
