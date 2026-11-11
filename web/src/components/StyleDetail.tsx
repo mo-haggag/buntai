@@ -276,6 +276,7 @@ function DataTab({ voice }: { voice: Voice }) {
   };
 
   const rebuild = async () => {
+    if (!window.confirm(`Rebuild ${voice.name}'s training pairs and train again?\n\nAbout 15 minutes: new requests are written for every passage, then a new run trains and is judged. The GPU is busy meanwhile. Cancel any time from Jobs.`)) return;
     setBusy(true);
     try {
       await api.rerun(voice.id, "build");
@@ -400,7 +401,9 @@ function TrainingTab({ voice, onUpdate }: { voice: Voice; onUpdate: (v: Voice) =
     }
   };
 
+  const minutes = Math.max(5, Math.round(((voice.metrics?.train_seconds ?? 600) + 300) / 60));
   const retrain = async () => {
+    if (!window.confirm(`Train ${voice.name} again from scratch on the same data?\n\nA new run, about ${minutes} minutes. The GPU is busy meanwhile, so writing pauses. The current adapter stays until the new run finishes and can be switched back to.`)) return;
     setBusy("retrain");
     try {
       await api.rerun(voice.id, "train");
@@ -410,6 +413,7 @@ function TrainingTab({ voice, onUpdate }: { voice: Voice; onUpdate: (v: Voice) =
     }
   };
   const cont = async () => {
+    if (!window.confirm(`Continue training ${voice.name}?\n\nTwo more epochs from the current adapter at a lower learning rate, about ${Math.max(3, Math.round(minutes / 2))} minutes. The GPU is busy meanwhile, so writing pauses. Cancel any time from Jobs.`)) return;
     setBusy("continue");
     try {
       await api.rerun(voice.id, "train", { continue: true });

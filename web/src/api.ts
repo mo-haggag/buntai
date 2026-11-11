@@ -187,6 +187,7 @@ export interface Api {
   addWriting(id: string, input: Omit<NewVoice, "name">): Promise<{ id: string }>;
   getMachine(): Promise<Machine>;
   getJobs(): Promise<Jobs>;
+  cancelJob(voice: string): Promise<{ cancelled: string }>;
   downloadModel(id: string): Promise<{ id: string }>;
   generate(req: GenRequest, signal?: AbortSignal): AsyncGenerator<GenEvent>;
 }
@@ -265,6 +266,7 @@ const httpApi: Api = {
   },
   getMachine: () => getJson<Machine>("/api/machine"),
   getJobs: () => getJson<Jobs>("/api/jobs"),
+  cancelJob: (voice) => getJson<{ cancelled: string }>(`/api/jobs/${enc(voice)}/cancel`, { method: "POST" }),
   downloadModel: (id) =>
     getJson<{ id: string }>("/api/machine/download", {
       method: "POST",

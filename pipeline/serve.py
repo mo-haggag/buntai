@@ -45,6 +45,7 @@ def log_job(**rec) -> None:
     with open(JOBS_LOG, "a") as f:
         f.write(json.dumps({"at": time.time(), **rec}) + "\n")
 running: set[str] = set()
+tasks: dict[str, asyncio.Task] = {}  # voice -> the pipeline task, so a job can be cancelled
 training_run: dict[str, str] = {}    # voice -> run id while a run is in progress
 jobs = asyncio.Lock()                # one GPU job (train or eval) at a time
 
@@ -275,6 +276,8 @@ async def run_pipeline(vid: str, skip: tuple[str, ...] = (), continue_from: str 
     (RUNS / vid).mkdir(parents=True, exist_ok=True)
     logf = open(RUNS / vid / "pipeline.log", "a")
     held_jobs = False
+    proc = None
+    stage = ""
     try:
         for stage, cmd in steps:
             if stage in skip:
@@ -292,6 +295,7 @@ async def run_pipeline(vid: str, skip: tuple[str, ...] = (), continue_from: str 
                     gpu.busy = vid
             if stage == "train":
                 training_run[vid] = rid
+            proc = None
             proc = await asyncio.create_subprocess_exec(*cmd, cwd=str(ROOT), stdout=asyncio.subprocess.PIPE,
                                                         stderr=asyncio.subprocess.STDOUT, env=os.environ.copy(),
                                                         limit=4 * 1024 * 1024)  # a stats line can be long
@@ -318,10 +322,20 @@ async def run_pipeline(vid: str, skip: tuple[str, ...] = (), continue_from: str 
             if stage == "train":
                 training_run.pop(vid, None)
         set_stage(vid, "ready")
+    except asyncio.CancelledError:  # the user cancelled the job
+        if proc is not None and proc.returncode is None:
+            proc.terminate()
+            with contextlib.suppress(Exception):
+                await asyncio.wait_for(proc.wait(), 15)
+        log_job(voice=vid, stage=stage, event="end", run=rid, ok=False, cancelled=True,
+                seconds=round(time.time() - stage_started.get(vid, time.time()), 1))
+        set_stage(vid, "ready" if adapter_path(vid) else "idle")
+        logf.write("[runner] cancelled during %s\n" % stage)
     except Exception as e:  # the runner itself failed: say so instead of leaving the stage stuck
         set_stage(vid, "error", "runner failed: %s" % e)
         logf.write("[runner] %s\n" % e)
     finally:
+        tasks.pop(vid, None)
         stage_started.pop(vid, None)
         training_run.pop(vid, None)
         if held_jobs:
@@ -393,7 +407,7 @@ async def create_voice(req: web.Request) -> web.Response:
               "source_kind": "files" if (text or files) else "url"}
     save_voices(v)
     set_stage(vid, "collect")
-    asyncio.get_event_loop().create_task(run_pipeline(vid))
+    tasks[vid] = asyncio.get_event_loop().create_task(run_pipeline(vid))
     return web.json_response({"id": vid})
 
 
@@ -413,8 +427,19 @@ async def rerun(req: web.Request) -> web.Response:
     cont = active_run(vid) if body.get("continue") else None
     if body.get("continue") and not cont:
         return web.json_response({"error": "nothing to continue from"}, status=400)
-    asyncio.get_event_loop().create_task(run_pipeline(vid, tuple(order[: order.index(start)]), cont))
+    tasks[vid] = asyncio.get_event_loop().create_task(run_pipeline(vid, tuple(order[: order.index(start)]), cont))
     return web.json_response({"id": vid, "from": start, "continue_from": cont})
+
+
+@routes.post("/api/jobs/{id}/cancel")
+async def cancel_job(req: web.Request) -> web.Response:
+    """Stop a style's running or queued job. A running step's process is terminated; the style keeps its last adapter."""
+    vid = req.match_info["id"]
+    task = tasks.get(vid)
+    if not task or task.done():
+        return web.json_response({"error": "no job running for %s" % vid}, status=404)
+    task.cancel()
+    return web.json_response({"cancelled": vid})
 
 
 @routes.post("/api/voices/{id}/add")
@@ -450,7 +475,7 @@ async def add_writing(req: web.Request) -> web.Response:
         v[vid]["source_kind"] = "url"
         save_voices(v)
     set_stage(vid, "collect")
-    asyncio.get_event_loop().create_task(run_pipeline(vid))
+    tasks[vid] = asyncio.get_event_loop().create_task(run_pipeline(vid))
     return web.json_response({"id": vid})
 
 

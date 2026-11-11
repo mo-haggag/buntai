@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { Activity, Check, CircleAlert, Clock } from "lucide-react";
+import { Activity, Check, CircleAlert, Clock, X } from "lucide-react";
 import { api } from "../api";
 import type { Jobs as JobsInfo } from "../api";
-import { Card, ErrorNote, PageHeader, Progress, Spinner, StageBadge, cx, fmtDuration, fmtWhen } from "./ui";
+import { Button, Card, ErrorNote, PageHeader, Progress, Spinner, StageBadge, cx, fmtDuration, fmtWhen } from "./ui";
 import type { Stage } from "../api";
 
 const STAGE_TEXT: Record<string, string> = { collect: "Collecting", build: "Building pairs", train: "Training", eval: "Evaluating" };
@@ -66,10 +66,22 @@ export function Jobs() {
                     <StageBadge stage={(j.stage ?? "idle") as Stage} />
                   </div>
                   {j.progress && !waiting && <Progress progress={j.progress} />}
-                  <div className="flex items-center gap-1.5 text-xs text-ink-3 tabular-nums">
-                    <Clock className="size-3.5" aria-hidden />
-                    {j.since ? `${fmtDuration((now / 1000) - j.since)} in this step` : ""}
-                    {j.run && <span className="ml-2">run {j.run}</span>}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-1.5 text-xs text-ink-3 tabular-nums">
+                      <Clock className="size-3.5" aria-hidden />
+                      {j.since ? `${fmtDuration((now / 1000) - j.since)} in this step` : ""}
+                      {j.run && <span className="ml-2">run {j.run}</span>}
+                    </div>
+                    <Button
+                      className="h-8"
+                      onClick={() => {
+                        if (window.confirm(`Cancel ${j.name}'s job? ${waiting ? "It leaves the queue." : "The running step stops; the style keeps its last adapter."}`))
+                          api.cancelJob(j.voice).then(load).catch((e) => setError(e instanceof Error ? e.message : String(e)));
+                      }}
+                    >
+                      <X className="size-4" aria-hidden />
+                      Cancel
+                    </Button>
                   </div>
                 </Card>
               );
@@ -94,7 +106,7 @@ export function Jobs() {
                 <span className="text-ink-3 tabular-nums">{r.seconds !== undefined ? fmtDuration(r.seconds) : ""}</span>
                 <span className={cx("inline-flex items-center gap-1 text-xs font-medium", r.ok ? "text-good" : "text-bad")}>
                   {r.ok ? <Check className="size-3.5" strokeWidth={3} aria-hidden /> : <CircleAlert className="size-3.5" aria-hidden />}
-                  {r.ok ? "Done" : `Failed (exit ${r.exit})`}
+                  {r.ok ? "Done" : r.exit === undefined ? "Cancelled" : `Failed (exit ${r.exit})`}
                 </span>
               </div>
             ))}

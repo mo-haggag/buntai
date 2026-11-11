@@ -299,6 +299,12 @@ export const mockApi: Api = {
       gpu_busy: live[0]?.id ?? null,
     };
   },
+  async cancelJob(voice) {
+    await sleep(100);
+    const i = sims.findIndex((s) => s.id === voice);
+    if (i >= 0) sims.splice(i, 1);
+    return { cancelled: voice };
+  },
   async downloadModel(id) {
     await sleep(100);
     return { id };
