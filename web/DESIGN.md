@@ -22,7 +22,11 @@ System font stack. Sizes used: 12px (`text-xs`) for labels and metadata, 14px (`
 
 ## Primitives (`src/components/ui.tsx`)
 
-`Button` (primary, secondary, ghost), `Card`, `Panel` (inset block inside a card), `PageHeader`, `Tabs`, `Stat` (label, value, sub), `Dot` (series marker), `StageBadge`, `ProgressBar`, `Progress`, `Paragraphs` (model text), `EmptyState`, `Toggle`, `Select`, `inputClass`.
+`Button` (primary, secondary, ghost), `Card`, `Panel` (inset block inside a card), `PageHeader`, `Tabs`, `Stat` (label, value, sub), `Dot` (series marker), `StageBadge`, `ProgressBar`, `Progress`, `Paragraphs` (model text as paragraphs), `Markdown` (model text as a document: headings, lists, quotes, code, bold, italic; no HTML), `EmptyState`, `ErrorNote`, `Toggle`, `Select`, `inputClass`, `textareaClass`.
+
+## Shell
+
+A side rail with two groups, Use (Write) and Train (Styles, New style, Benchmark, Machine). Use screens show one output and no numbers. Train screens show comparisons, numbers and the machine. Nothing from one group appears in the other.
 
 ## Rules
 
