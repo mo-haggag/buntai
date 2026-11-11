@@ -1,4 +1,4 @@
-import { ArrowRight, ChevronRight, FileText, Plus, Signature } from "lucide-react";
+import { ArrowRight, ChevronRight, FileText, Signature } from "lucide-react";
 import type { Voice } from "../api";
 import { Button, EmptyState, PageHeader, Progress, StageBadge, cx, fmtCompact, hostOf, isRunning } from "./ui";
 
@@ -10,7 +10,7 @@ export function StylesView({ voices, loaded }: { voices: Voice[]; loaded: boolea
         sub="Each style is a small adapter on the same local model."
         actions={
           <Button variant="primary" onClick={() => (window.location.hash = "#/new")}>
-            <Plus className="size-4" aria-hidden />
+            <Signature className="size-4" aria-hidden />
             New style
           </Button>
         }

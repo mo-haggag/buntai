@@ -36,8 +36,7 @@ One family (lucide), one stroke weight. Sizes: 16 px (`size-4`) in the rail, but
 |---|---|---|
 | Brand | `Feather` | the logo only |
 | Write (use a style) | `SquarePen` | rail, Start, "Write with it", the Write button |
-| Styles (a person's hand) | `Signature` | rail, lists |
-| New style (the one action in the rail) | `Plus` | the rail button, Start, Styles |
+| A style (a person's hand), and making one | `Signature` | rail, the New style button, Start, lists |
 | Activity, something running | `Activity` | rail, the live line at the foot of the rail |
 | Benchmark, judging | `Scale` | rail, Compare button |
 | Machine, GPU | `Cpu` | rail, Start, GPU panel |

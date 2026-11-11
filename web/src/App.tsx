@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Activity, Cpu, Feather, Laptop, Monitor, Moon, Plus, Scale, Signature, SquarePen, Sun } from "lucide-react";
+import { Activity, Cpu, Feather, Laptop, Monitor, Moon, Scale, Signature, SquarePen, Sun } from "lucide-react";
 import { api, isMock } from "./api";
 import type { Voice } from "./api";
 import { APP_NAME } from "./brand";
@@ -83,7 +83,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
     ],
   },
 ];
-const NEW: NavItem = { section: "new", label: "New style", icon: <Plus className="size-4" aria-hidden />, href: "#/new" };
+const NEW: NavItem = { section: "new", label: "New style", icon: <Signature className="size-4" aria-hidden />, href: "#/new" };
 
 export default function App() {
   const route = useRoute();
@@ -151,7 +151,7 @@ export default function App() {
     <div className="min-h-screen md:grid md:grid-cols-[var(--rail-width)_1fr]">
       {/* Side menu */}
       <aside className="sticky top-0 hidden h-screen flex-col gap-6 border-r border-line bg-surface px-3 py-4 md:flex">
-        <a href="#/" title="Start" className="flex items-center gap-2.5 rounded-(--radius-control) px-2 py-1 hover:bg-sunken">
+        <a href="#/" title="Start" className="flex items-center gap-2.5 rounded-(--radius-control) px-3 py-1 hover:bg-sunken">
           <span className="flex size-8 items-center justify-center rounded-(--radius-control) bg-accent text-white">
             <Feather className="size-4" aria-hidden />
           </span>

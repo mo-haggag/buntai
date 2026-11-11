@@ -1,4 +1,4 @@
-import { ArrowRight, Cpu, Plus, Signature, SquarePen } from "lucide-react";
+import { ArrowRight, Cpu, Signature, SquarePen } from "lucide-react";
 import type { ReactNode } from "react";
 import type { Voice } from "../api";
 import { APP_NAME } from "../brand";
@@ -26,7 +26,7 @@ export function Home({ voices, busy }: { voices: Voice[]; busy: string | null })
       <div className="grid gap-4 sm:grid-cols-3">
         <Choice
           href="#/new"
-          icon={<Plus className="size-5" aria-hidden />}
+          icon={<Signature className="size-5" aria-hidden />}
           title="Train a style"
           sub="From a blog, files or pasted text. About ten minutes."
           primary={ready.length === 0}

@@ -110,6 +110,15 @@ Everything above is one mechanism: pairs of (request → text in the target regi
 
 Two cautions apply to every case. The adapter carries form, not facts, so a draft is checked before it leaves the building, and more so in legal and medical settings. And the judge test is the honest signal: for a plain register that frontier models already write well, an adapter can measure closer to the source without beating a frontier model, and the numbers will say so.
 
+## Judge it without running it
+
+Everything a judgment needs is in this repository or linked from it.
+
+- **Judged samples, in full.** For each style, the 20 held-out requests with the author's real passage, the adapter's output, GPT-5.5's imitation, the base model's output, and the judge's two votes: [Garry Tan](docs/samples/garry.md), [Sam Altman](docs/samples/sam.md), [Paul Graham](docs/samples/pg.md).
+- **The adapters.** On the Hugging Face Hub, 132 MB each, with model cards: [buntai-garry-tan](https://huggingface.co/mo-haggag/buntai-garry-tan), [buntai-sam-altman](https://huggingface.co/mo-haggag/buntai-sam-altman), [buntai-paul-graham](https://huggingface.co/mo-haggag/buntai-paul-graham). Base model: [Qwen/Qwen3-VL-4B-Instruct](https://huggingface.co/Qwen/Qwen3-VL-4B-Instruct).
+- **The data, as an example of how it is organised.** `data/corpus/<style>/posts.jsonl` is what the collector produced (one post per line: url, title, date, text). `data/train/<style>/train.jsonl` and `eval.jsonl` are what the builder produced (chat-format pairs, with the source url and title). The text is the authors' public writing, included here as a research artifact; it comes down on an author's request.
+- **The screens**, above, are real screenshots of the app running these styles.
+
 ## Run it
 
 Needs an NVIDIA GPU with 16 GB or more, Node 22+, the Qwen3-VL-4B weights in `models/qwen3vl-4b/` (the Machine page downloads them), and `OPENAI_API_KEY` for writing the training requests and the GPT-5.5 comparison. Everything installs inside the project; `env.sh` keeps every cache in `.cache/`.
@@ -131,4 +140,4 @@ python pipeline/evaluate.py --voice garry --name "Garry Tan" --checkpoints
 
 ## What is not in this repo
 
-The collected essays, the training pairs, the adapters and the checkpoints. They are the authors' writing and derived from it, so they stay on the machine that made them (`data/` and `runs/` are git-ignored).
+The adapters and checkpoints (on the Hub instead, see above), the base model weights, uploaded files, and the run folders under `runs/` with their logs.

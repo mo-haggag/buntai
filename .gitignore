@@ -3,10 +3,9 @@
 models/
 runs/
 data/raw/
-data/corpus/
+data/corpus/*/uploads/
 node_modules/
 web/dist/
 *.log
 .env
-data/train/
 scratch/
