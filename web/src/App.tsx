@@ -23,7 +23,7 @@ interface Route {
 const TABS: DetailTab[] = ["overview", "data", "training", "evaluation"];
 
 function parseHash(hash: string): Route {
-  const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
+  const parts = hash.replace(/^#\/?/, "").split("?")[0].split("/").filter(Boolean);
   if (parts[0] === "write") return { section: "write" };
   if (parts[0] === "new") return { section: "new" };
   if (parts[0] === "styles" && parts[1]) {
