@@ -259,6 +259,13 @@ export const mockApi: Api = {
     data.excluded = [...set];
     return { excluded: data.excluded };
   },
+  async addWriting(id) {
+    await sleep(200);
+    const sim = sims.find((s) => s.id === id);
+    if (sim) sim.startedAt = Date.now();
+    else sims.push({ id, name: allVoices().find((v) => v.id === id)?.name ?? id, source: "", startedAt: Date.now() });
+    return { id };
+  },
   async rerun(id) {
     await sleep(200);
     const sim = sims.find((s) => s.id === id);

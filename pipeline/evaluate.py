@@ -86,6 +86,51 @@ def pick(items: list[dict], n: int) -> list[dict]:
     return out[:n]
 
 
+def pick_checkpoint(run: Path, base, tok, samples: list[dict], a) -> Path:
+    """Judge each saved epoch against the real passages (one vote per sample: can the judge tell the
+    imitation from the author?) and copy the winner over the run's adapter. Perplexity already
+    filtered the epochs; this filters by voice."""
+    import shutil
+    cps = sorted((run / "checkpoints").glob("epoch-*"), key=lambda p: int(p.name.split("-")[1]))
+    if len(cps) < 2:
+        return run / "adapter"
+    scores = {}
+    for cp in cps:
+        model = PeftModel.from_pretrained(base, str(cp))
+        model.eval()
+        fooled = 0
+        for i, smp in enumerate(samples):
+            ins, ref = smp["messages"][0]["content"], smp["messages"][1]["content"]
+            ids = tok.apply_chat_template([{"role": "user", "content": ins}], add_generation_prompt=True,
+                                          return_tensors="pt", return_dict=True).to("cuda")
+            torch.manual_seed(i)
+            out = model.generate(**ids, max_new_tokens=min(600, int(len(ref.split()) * 2.0) + 80), do_sample=True,
+                                 temperature=0.7, top_p=0.9, repetition_penalty=1.05)
+            text = tok.decode(out[0, ids["input_ids"].shape[1]:], skip_special_tokens=True).strip()
+            first, second = (text, ref) if i % 2 else (ref, text)
+            prompt = ("Two passages below. One is by the author, one is an imitation. Which is the imitation? "
+                      "Reply with A or B only.\n\nCandidate A:\n\"\"\"\n%s\n\"\"\"\n\nCandidate B:\n\"\"\"\n%s\n\"\"\"" % (first, second))
+            try:
+                ans = gpt(prompt, a.judge_model).strip().upper()[:1]
+            except Exception:
+                continue
+            imitation_is_a = bool(i % 2)
+            fooled += int((ans == "A") != imitation_is_a)  # the judge pointed at the real passage
+        scores[cp.name] = fooled
+        print("checkpoint %s fooled the judge %d/%d" % (cp.name, fooled, len(samples)), file=sys.stderr, flush=True)
+        model.unload()
+        del model
+        torch.cuda.empty_cache()
+    best = max(scores, key=scores.get)
+    shutil.rmtree(run / "adapter", ignore_errors=True)
+    shutil.copytree(run / "checkpoints" / best, run / "adapter")
+    metrics_file = run / "metrics.json"
+    old = json.loads(metrics_file.read_text()) if metrics_file.exists() else {}
+    metrics_file.write_text(json.dumps({**old, "checkpoint_judge": scores, "picked_checkpoint": best}, indent=1))
+    print(json.dumps({"checkpoint_judge": scores, "picked": best}), flush=True)
+    return run / "adapter"
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--voice", required=True)
@@ -93,6 +138,8 @@ def main() -> None:
     ap.add_argument("--n", type=int, default=20)
     ap.add_argument("--judge-model", default="gpt-5.4")
     ap.add_argument("--model-dir", default=str(ROOT / "models" / "qwen3vl-4b"))
+    ap.add_argument("--checkpoints", action="store_true",
+                    help="judge every saved epoch of the active run and promote the one the judge prefers")
     a = ap.parse_args()
 
     voice_dir = ROOT / "runs" / a.voice
@@ -107,7 +154,10 @@ def main() -> None:
 
     tok = AutoTokenizer.from_pretrained(a.model_dir)
     base = AutoModelForImageTextToText.from_pretrained(a.model_dir, dtype=torch.bfloat16, device_map="cuda")
-    model = PeftModel.from_pretrained(base, str(run / "adapter"))
+    adapter_dir = run / "adapter"
+    if a.checkpoints:
+        adapter_dir = pick_checkpoint(run, base, tok, samples, a)
+    model = PeftModel.from_pretrained(base, str(adapter_dir))
     model.eval()
 
     def write(instruction: str, ref_words: int, tuned: bool, seed: int) -> str:

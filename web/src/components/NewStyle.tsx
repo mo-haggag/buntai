@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { FileText, Globe, Type, Upload, X } from "lucide-react";
 import { api } from "../api";
+import type { Voice } from "../api";
 import { Button, Card, PageHeader, cx, fmtInt, inputClass, textareaClass } from "./ui";
 
 type Source = "url" | "files" | "text";
@@ -14,7 +15,14 @@ const SOURCES: { key: Source; label: string; icon: typeof Globe }[] = [
 
 const ACCEPT = ".txt,.md,.markdown,.docx";
 
-export function NewStyle({ onCreated }: { onCreated: (id: string) => void }) {
+function addTarget(): string {
+  const q = window.location.hash.split("?")[1];
+  return new URLSearchParams(q ?? "").get("add") ?? "";
+}
+
+export function NewStyle({ onCreated, voices }: { onCreated: (id: string) => void; voices: Voice[] }) {
+  const addId = addTarget();
+  const adding = voices.find((v) => v.id === addId);
   const [name, setName] = useState("");
   const [source, setSource] = useState<Source>("url");
   const [url, setUrl] = useState("");
@@ -26,7 +34,7 @@ export function NewStyle({ onCreated }: { onCreated: (id: string) => void }) {
 
   const words = source === "text" ? text.trim().split(/\s+/).filter(Boolean).length : 0;
   const ready =
-    name.trim() && (source === "url" ? url.trim() : source === "files" ? files.length > 0 : words >= 300);
+    (adding || name.trim()) && (source === "url" ? url.trim() : source === "files" ? files.length > 0 : words >= 300);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -36,12 +44,12 @@ export function NewStyle({ onCreated }: { onCreated: (id: string) => void }) {
     try {
       let u = url.trim();
       if (u && !/^https?:\/\//i.test(u)) u = `https://${u}`;
-      const { id } = await api.createVoice({
-        name: name.trim(),
+      const input = {
         source: source === "url" ? u : undefined,
         text: source === "text" ? text : undefined,
         files: source === "files" ? files : undefined,
-      });
+      };
+      const { id } = adding ? await api.addWriting(adding.id, input) : await api.createVoice({ name: name.trim(), ...input });
       onCreated(id);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -60,14 +68,19 @@ export function NewStyle({ onCreated }: { onCreated: (id: string) => void }) {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="New style" sub="Collect, build pairs, train and evaluate run on their own once you start." />
+      <PageHeader
+        title={adding ? `Add writing to ${adding.name}` : "New style"}
+        sub={adding ? "The new writing joins what is already collected, then the style trains again." : "Collect, build pairs, train and evaluate run on their own once you start."}
+      />
 
       <form onSubmit={submit} className="space-y-6">
         <Card className="space-y-5 p-5">
-          <label className="block max-w-sm space-y-1.5">
-            <span className="text-sm font-medium text-ink-2">Whose style</span>
-            <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} placeholder="Garry Tan" autoFocus />
-          </label>
+          {!adding && (
+            <label className="block max-w-sm space-y-1.5">
+              <span className="text-sm font-medium text-ink-2">Whose style</span>
+              <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} placeholder="Garry Tan" autoFocus />
+            </label>
+          )}
 
           <div className="space-y-3">
             <span className="text-sm font-medium text-ink-2">Their writing</span>
@@ -163,7 +176,7 @@ export function NewStyle({ onCreated }: { onCreated: (id: string) => void }) {
             Cancel
           </Button>
           <Button type="submit" variant="primary" disabled={!ready || busy}>
-            {busy ? "Starting" : "Start"}
+            {busy ? "Starting" : adding ? "Add and train" : "Start"}
           </Button>
         </div>
       </form>

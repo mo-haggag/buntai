@@ -3,7 +3,9 @@
 Loss is taken on the passage tokens only (the author's words), never on the request.
 At the end of every epoch the script measures perplexity on the held-out passages: how
 predictable the author's real, unseen writing is to the model (lower = closer). The
-adapter from the best epoch is the one kept, so extra epochs cannot make the result worse.
+adapter from the best epoch is the one kept, so extra epochs cannot make the result worse. Every
+epoch's adapter also stays under checkpoints/, so `evaluate.py --checkpoints` can let the judge pick
+instead (perplexity and the judge can disagree, as they did for Sam Altman).
 Small corpora get more epochs so every run has at least MIN_STEPS optimizer steps.
 
 Each run lives in runs/<voice>/runs/<run id>/ (adapter/, train_log.jsonl, train_state.json,
@@ -21,7 +23,7 @@ import time
 from pathlib import Path
 
 import torch
-from peft import LoraConfig, get_peft_model
+from peft import LoraConfig, PeftModel, get_peft_model
 from transformers import AutoModelForImageTextToText, AutoTokenizer
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -68,6 +70,7 @@ def main() -> None:
     ap.add_argument("--accum", type=int, default=8)
     ap.add_argument("--max-len", type=int, default=1024)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--from-run", default="", help="continue training from this run's adapter instead of starting fresh")
     a = ap.parse_args()
 
     random.seed(a.seed)
@@ -91,7 +94,7 @@ def main() -> None:
         epochs = min(MAX_EPOCHS, math.ceil(MIN_STEPS / steps_per_epoch))
     total = steps_per_epoch * epochs
     warm = max(1, total // 20)
-    info = {"id": a.run_id, "created": time.time(), "epochs": epochs, "epochs_requested": a.epochs,
+    info = {"id": a.run_id, "created": time.time(), "epochs": epochs, "epochs_requested": a.epochs, "from_run": a.from_run or None,
             "rank": a.rank, "lr": a.lr, "accum": a.accum, "train_pairs": len(train), "eval_passages": len(held),
             "total_steps": total}
     (run / "info.json").write_text(json.dumps(info, indent=1))
@@ -100,8 +103,12 @@ def main() -> None:
     ppl_base = perplexity(model, held)
     print("held-out perplexity, base: %.3f (%.0fs)" % (ppl_base, time.time() - t0), flush=True)
 
-    model = get_peft_model(model, LoraConfig(
-        r=a.rank, lora_alpha=2 * a.rank, lora_dropout=0.05, target_modules=TARGETS, task_type="CAUSAL_LM"))
+    if a.from_run:
+        model = PeftModel.from_pretrained(model, str(voice_dir / "runs" / a.from_run / "adapter"), is_trainable=True)
+        print("continuing from run %s" % a.from_run, flush=True)
+    else:
+        model = get_peft_model(model, LoraConfig(
+            r=a.rank, lora_alpha=2 * a.rank, lora_dropout=0.05, target_modules=TARGETS, task_type="CAUSAL_LM"))
     model.print_trainable_parameters()
     model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
     model.enable_input_require_grads()
@@ -157,6 +164,7 @@ def main() -> None:
             ppl_by_epoch.append(round(ppl, 3))
             log.write(json.dumps({"epoch_end": epoch, "ppl": round(ppl, 3), "step": step}) + "\n")
             log.flush()
+            model.save_pretrained(run / "checkpoints" / ("epoch-%d" % epoch))  # every epoch kept: a judge can pick later
             if ppl < best_ppl:
                 best_ppl, best_epoch = ppl, epoch
                 model.save_pretrained(run / "adapter")

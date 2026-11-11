@@ -155,7 +155,8 @@ export interface Api {
   getSamples(id: string, run?: string): Promise<Sample[]>;
   activateRun(id: string, run: string): Promise<{ active: string }>;
   excludePost(id: string, url: string, excluded: boolean): Promise<{ excluded: string[] }>;
-  rerun(id: string, from: "collect" | "build" | "train" | "eval"): Promise<{ id: string }>;
+  rerun(id: string, from: "collect" | "build" | "train" | "eval", opts?: { continue?: boolean }): Promise<{ id: string }>;
+  addWriting(id: string, input: Omit<NewVoice, "name">): Promise<{ id: string }>;
   getMachine(): Promise<Machine>;
   downloadModel(id: string): Promise<{ id: string }>;
   generate(req: GenRequest, signal?: AbortSignal): AsyncGenerator<GenEvent>;
@@ -220,12 +221,19 @@ const httpApi: Api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url, excluded }),
     }),
-  rerun: (id, from) =>
+  rerun: (id, from, opts) =>
     getJson<{ id: string }>(`/api/voices/${enc(id)}/run`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ from }),
+      body: JSON.stringify({ from, continue: !!opts?.continue }),
     }),
+  addWriting: (id, input) => {
+    const form = new FormData();
+    if (input.source) form.append("source", input.source);
+    if (input.text) form.append("text", input.text);
+    for (const f of input.files ?? []) form.append("files", f, f.name);
+    return getJson<{ id: string }>(`/api/voices/${enc(id)}/add`, { method: "POST", body: form });
+  },
   getMachine: () => getJson<Machine>("/api/machine"),
   downloadModel: (id) =>
     getJson<{ id: string }>("/api/machine/download", {

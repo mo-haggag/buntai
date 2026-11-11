@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { BookOpenText, Cpu, Feather, Laptop, Monitor, Moon, PenLine, Plus, Scale, Sun } from "lucide-react";
+import { Columns3, Feather, House, Laptop, Library, Microchip, Monitor, Moon, PenLine, Sun, WandSparkles } from "lucide-react";
 import { api, isMock } from "./api";
 import type { Voice } from "./api";
-import { APP_NAME, APP_TAGLINE } from "./brand";
+import { APP_NAME } from "./brand";
 import { useTheme } from "./theme";
 import type { ThemePref } from "./theme";
+import { Home } from "./components/Home";
 import { Machine } from "./components/Machine";
 import { NewStyle } from "./components/NewStyle";
 import { StyleDetail } from "./components/StyleDetail";
@@ -15,7 +16,7 @@ import { UseWrite } from "./components/UseWrite";
 import { WriteView } from "./components/WriteView";
 import { ErrorNote, cx, isRunning } from "./components/ui";
 
-type Section = "write" | "styles" | "new" | "benchmark" | "machine";
+type Section = "home" | "write" | "styles" | "new" | "benchmark" | "machine";
 interface Route {
   section: Section;
   id?: string;
@@ -26,6 +27,7 @@ const TABS: DetailTab[] = ["overview", "data", "training", "evaluation"];
 
 function parseHash(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("?")[0].split("/").filter(Boolean);
+  if (parts.length === 0) return { section: "home" };
   if (parts[0] === "write") return { section: "write" };
   if (parts[0] === "benchmark") return { section: "benchmark" };
   if (parts[0] === "machine") return { section: "machine" };
@@ -59,6 +61,7 @@ interface NavItem {
   href: string;
 }
 
+const START: NavItem = { section: "home", label: "Start", icon: <House className="size-4" aria-hidden />, href: "#/" };
 const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "Use",
@@ -67,10 +70,10 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "Train",
     items: [
-      { section: "styles", label: "Styles", icon: <BookOpenText className="size-4" aria-hidden />, href: "#/styles" },
-      { section: "new", label: "New style", icon: <Plus className="size-4" aria-hidden />, href: "#/new" },
-      { section: "benchmark", label: "Benchmark", icon: <Scale className="size-4" aria-hidden />, href: "#/benchmark" },
-      { section: "machine", label: "Machine", icon: <Cpu className="size-4" aria-hidden />, href: "#/machine" },
+      { section: "new", label: "New style", icon: <WandSparkles className="size-4" aria-hidden />, href: "#/new" },
+      { section: "styles", label: "Styles", icon: <Library className="size-4" aria-hidden />, href: "#/styles" },
+      { section: "benchmark", label: "Benchmark", icon: <Columns3 className="size-4" aria-hidden />, href: "#/benchmark" },
+      { section: "machine", label: "Machine", icon: <Microchip className="size-4" aria-hidden />, href: "#/machine" },
     ],
   },
 ];
@@ -135,16 +138,14 @@ export default function App() {
     <div className="min-h-screen md:grid md:grid-cols-[var(--rail-width)_1fr]">
       {/* Side menu */}
       <aside className="sticky top-0 hidden h-screen flex-col gap-6 border-r border-line bg-surface px-3 py-4 md:flex">
-        <a href="#/write" className="flex items-center gap-2.5 px-2">
+        <a href="#/" className="flex items-center gap-2.5 px-2">
           <span className="flex size-8 items-center justify-center rounded-(--radius-control) bg-accent text-white">
             <Feather className="size-4" aria-hidden />
           </span>
-          <span className="leading-tight">
-            <span className="block font-semibold tracking-tight">{APP_NAME}</span>
-            <span className="block text-[11px] text-ink-3">{APP_TAGLINE}</span>
-          </span>
+          <span className="font-semibold tracking-tight">{APP_NAME}</span>
         </a>
         <nav className="flex flex-col gap-5">
+          <div className="flex flex-col gap-0.5">{link(START)}</div>
           {GROUPS.map((g) => (
             <div key={g.title} className="flex flex-col gap-0.5">
               <div className="px-3 pb-1 text-[11px] font-semibold tracking-wider text-ink-3 uppercase">{g.title}</div>
@@ -170,12 +171,14 @@ export default function App() {
           <Feather className="size-4" aria-hidden />
         </span>
         <span className="font-semibold">{APP_NAME}</span>
-        <div className="ml-auto flex gap-1">{GROUPS.flatMap((g) => g.items).map((n) => link(n, true))}</div>
+        <div className="ml-auto flex gap-1">{[START, ...GROUPS.flatMap((g) => g.items)].map((n) => link(n, true))}</div>
       </header>
 
       <main className="min-w-0 px-4 py-6 sm:px-8 sm:py-8">
         <div className="mx-auto max-w-6xl space-y-6">
           {listError && <ErrorNote onRetry={refresh}>Server not reachable ({listError})</ErrorNote>}
+
+          {route.section === "home" && <Home voices={voices} busy={busy} />}
 
           {/* Write and Benchmark stay mounted once opened so a draft survives a visit to another section. */}
           {mounted.has("write") && (
@@ -205,6 +208,7 @@ export default function App() {
 
           {route.section === "new" && (
             <NewStyle
+              voices={voices}
               onCreated={(id) => {
                 refresh();
                 go(`styles/${encodeURIComponent(id)}`);

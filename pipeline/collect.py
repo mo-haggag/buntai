@@ -195,9 +195,9 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=8)
     a = ap.parse_args()
 
-    if a.files:
-        posts = read_files(Path(a.files))
-        write_corpus(a.voice, posts)
+    file_posts = read_files(Path(a.files)) if a.files else []
+    if a.files and not (a.urls or a.source):
+        write_corpus(a.voice, file_posts)
         return
     if a.urls:
         urls = [l.strip() for l in open(a.urls) if l.strip()]
@@ -216,7 +216,7 @@ def main() -> None:
 
     with ThreadPoolExecutor(a.workers) as ex:
         posts = [p for p in ex.map(one, urls) if p]
-    write_corpus(a.voice, posts)
+    write_corpus(a.voice, posts + file_posts)
 
 
 def docx_text(path: Path) -> str:

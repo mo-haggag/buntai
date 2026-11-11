@@ -241,19 +241,26 @@ PROGRESS_PATTERNS = [
 
 
 def collect_cmd(vid: str, meta: dict) -> list[str]:
+    """A blog URL, uploaded files, or both merged into one corpus."""
+    cmd = [PY, "pipeline/collect.py", "--voice", vid]
     uploads = DATA / "corpus" / vid / "uploads"
     if uploads.exists() and any(p.suffix.lower() in UPLOAD_TYPES for p in uploads.iterdir()):
-        return [PY, "pipeline/collect.py", "--voice", vid, "--files", str(uploads)]
-    return [PY, "pipeline/collect.py", "--voice", vid, "--source", meta["source"]]
+        cmd += ["--files", str(uploads)]
+    if meta.get("source", "").startswith("http"):
+        cmd += ["--source", meta["source"]]
+    return cmd
 
 
-async def run_pipeline(vid: str, skip: tuple[str, ...] = ()) -> None:
+async def run_pipeline(vid: str, skip: tuple[str, ...] = (), continue_from: str | None = None) -> None:
     meta = load_voices()[vid]
     rid = time.strftime("%Y%m%d-%H%M%S")
+    train_cmd = [PY, "pipeline/train.py", "--voice", vid, "--run-id", rid]
+    if continue_from:  # resume the current adapter: fewer epochs, a gentler learning rate
+        train_cmd += ["--from-run", continue_from, "--epochs", "2", "--lr", "1e-4"]
     steps = [
         ("collect", collect_cmd(vid, meta)),
         ("build", [PY, "pipeline/build.py", "--voice", vid]),
-        ("train", [PY, "pipeline/train.py", "--voice", vid, "--run-id", rid]),
+        ("train", train_cmd),
         ("eval", [PY, "pipeline/evaluate.py", "--voice", vid, "--name", meta["name"]]),
     ]
     running.add(vid)
@@ -386,11 +393,52 @@ async def rerun(req: web.Request) -> web.Response:
     if vid in running:
         return web.json_response({"error": "already running"}, status=409)
     order = ["collect", "build", "train", "eval"]
-    start = (await req.json()).get("from", "collect")
+    body = await req.json()
+    start = body.get("from", "collect")
     if start not in order:
         return web.json_response({"error": "from must be one of %s" % order}, status=400)
-    asyncio.get_event_loop().create_task(run_pipeline(vid, tuple(order[: order.index(start)])))
-    return web.json_response({"id": vid, "from": start})
+    cont = active_run(vid) if body.get("continue") else None
+    if body.get("continue") and not cont:
+        return web.json_response({"error": "nothing to continue from"}, status=400)
+    asyncio.get_event_loop().create_task(run_pipeline(vid, tuple(order[: order.index(start)]), cont))
+    return web.json_response({"id": vid, "from": start, "continue_from": cont})
+
+
+@routes.post("/api/voices/{id}/add")
+async def add_writing(req: web.Request) -> web.Response:
+    """More writing for an existing style (files, pasted text, or a new URL), then collect, build and train again."""
+    vid = req.match_info["id"]
+    v = load_voices()
+    if vid not in v:
+        raise web.HTTPNotFound()
+    if vid in running:
+        return web.json_response({"error": "already running"}, status=409)
+    source, text, files = "", "", []
+    reader = await req.multipart()
+    async for part in reader:
+        if part.name == "source":
+            source = (await part.text()).strip()
+        elif part.name == "text":
+            text = (await part.text()).strip()
+        elif part.name == "files" and part.filename:
+            files.append((Path(part.filename).name, await part.read(decode=False)))
+    if not (source.startswith("http") or text or files):
+        return web.json_response({"error": "give a URL, paste text, or upload files"}, status=400)
+    uploads = DATA / "corpus" / vid / "uploads"
+    if text or files:
+        uploads.mkdir(parents=True, exist_ok=True)
+        for fname, data in files:
+            if Path(fname).suffix.lower() in UPLOAD_TYPES:
+                (uploads / fname).write_bytes(data)
+        if text:
+            (uploads / ("pasted-%s.md" % time.strftime("%Y%m%d-%H%M%S"))).write_text(text)
+    if source.startswith("http"):
+        v[vid]["source"] = source
+        v[vid]["source_kind"] = "url"
+        save_voices(v)
+    set_stage(vid, "collect")
+    asyncio.get_event_loop().create_task(run_pipeline(vid))
+    return web.json_response({"id": vid})
 
 
 @routes.get("/api/voices/{id}/data")

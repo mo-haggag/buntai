@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { ArrowDown, Check, CircleAlert, Cpu, Download, ExternalLink, FileText, Gauge, Layers, PenLine, RefreshCw } from "lucide-react";
+import { ArrowDown, Check, CircleAlert, Cpu, Download, ExternalLink, FilePlus2, FileText, Gauge, Layers, PenLine, Play, RefreshCw } from "lucide-react";
 import { api } from "../api";
 import type { DataView, Judge, Run, Sample, Voice } from "../api";
 import { BASE_MODEL, FRONTIER_LABEL } from "../brand";
@@ -110,10 +110,24 @@ export function StyleDetail({
         }
         actions={
           voice.stage === "ready" && (
-            <Button variant="primary" onClick={() => (window.location.hash = `#/write?style=${encodeURIComponent(voice.id)}`)}>
-              <PenLine className="size-4" aria-hidden />
-              Write with it
-            </Button>
+            <>
+              <Button onClick={() => (window.location.hash = `#/new?add=${encodeURIComponent(voice.id)}`)} title="More files, text or a URL, then train again">
+                <FilePlus2 className="size-4" aria-hidden />
+                Add writing
+              </Button>
+              <Button onClick={() => api.rerun(voice.id, "train", { continue: true }).then(() => api.getVoice(voice.id)).then(onUpdate)} title="Resume from the current adapter">
+                <Play className="size-4" aria-hidden />
+                Continue training
+              </Button>
+              <Button onClick={() => api.rerun(voice.id, "train").then(() => api.getVoice(voice.id)).then(onUpdate)} title="A fresh run on the same data">
+                <RefreshCw className="size-4" aria-hidden />
+                Retrain
+              </Button>
+              <Button variant="primary" onClick={() => (window.location.hash = `#/write?style=${encodeURIComponent(voice.id)}`)}>
+                <PenLine className="size-4" aria-hidden />
+                Write with it
+              </Button>
+            </>
           )
         }
       />
