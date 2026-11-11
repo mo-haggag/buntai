@@ -26,7 +26,7 @@ System font stack. Sizes used: 12px (`text-xs`) for labels and metadata, 14px (`
 
 ## Shell
 
-A side rail with Start at the top, then two groups: Use (Write) and Train (New style, Styles, Jobs, Benchmark, Machine). While anything runs, a live line at the foot of the rail names it and links to Jobs. Start asks what you want to do; it is the only screen with no nav group. Use screens show one output and no numbers. Train screens show comparisons, numbers and the machine. Nothing from one group appears in the other.
+A side rail with Start at the top, then two groups: Use (Write) and Train (New style, Styles, Activity, Benchmark, Machine). While anything runs, a live line at the foot of the rail names it and links to Activity. Start asks what you want to do; it is the only screen with no nav group. Use screens show one output and no numbers. Train screens show comparisons, numbers and the machine. Nothing from one group appears in the other.
 
 ## Iconography
 
@@ -39,7 +39,7 @@ One family (lucide), one stroke weight. Sizes: 16 px (`size-4`) in the rail, but
 | Write (use a style) | `SquarePen` | rail, Start, "Write with it", the Write button |
 | Styles (each is a person) | `UsersRound` | rail, lists |
 | New style | `UserRoundPlus` | rail, Start, buttons |
-| Jobs, something running | `Activity` | rail, the live line at the foot of the rail |
+| Activity, something running | `Activity` | rail, the live line at the foot of the rail |
 | Benchmark, judging | `Scale` | rail, Compare button |
 | Machine, GPU | `Cpu` | rail, Start, GPU panel |
 | Collect, download | `Download` | pipeline step, model downloads |

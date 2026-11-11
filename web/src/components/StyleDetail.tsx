@@ -276,7 +276,7 @@ function DataTab({ voice }: { voice: Voice }) {
   };
 
   const rebuild = async () => {
-    if (!window.confirm(`Rebuild ${voice.name}'s training pairs and train again?\n\nAbout 15 minutes: new requests are written for every passage, then a new run trains and is judged. The GPU is busy meanwhile. Cancel any time from Jobs.`)) return;
+    if (!window.confirm(`Rebuild ${voice.name}'s training pairs and train again?\n\nAbout 15 minutes: new requests are written for every passage, then a new run trains and is judged. The GPU is busy meanwhile. Cancel any time from Activity.`)) return;
     setBusy(true);
     try {
       await api.rerun(voice.id, "build");
@@ -413,7 +413,7 @@ function TrainingTab({ voice, onUpdate }: { voice: Voice; onUpdate: (v: Voice) =
     }
   };
   const cont = async () => {
-    if (!window.confirm(`Continue training ${voice.name}?\n\nTwo more epochs from the current adapter at a lower learning rate, about ${Math.max(3, Math.round(minutes / 2))} minutes. The GPU is busy meanwhile, so writing pauses. Cancel any time from Jobs.`)) return;
+    if (!window.confirm(`Continue training ${voice.name}?\n\nTwo more epochs from the current adapter at a lower learning rate, about ${Math.max(3, Math.round(minutes / 2))} minutes. The GPU is busy meanwhile, so writing pauses. Cancel any time from Activity.`)) return;
     setBusy("continue");
     try {
       await api.rerun(voice.id, "train", { continue: true });

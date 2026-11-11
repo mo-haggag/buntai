@@ -41,7 +41,7 @@ export function Jobs() {
   const live = [...jobs.active, ...jobs.queued];
   return (
     <div className="space-y-8">
-      <PageHeader title="Jobs" sub="One GPU, one training or evaluation job at a time. The rest wait their turn." />
+      <PageHeader title="Activity" sub="What the machine is doing now, and what it did. One GPU, one training or evaluation at a time; the rest wait their turn." />
 
       <section className="space-y-3">
         <h2 className="flex items-center gap-2 font-semibold">

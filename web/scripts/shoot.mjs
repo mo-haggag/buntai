@@ -96,7 +96,7 @@ await shot("0-write", "#/write", async () => {
   await sleep(Number(process.env.WRITE_WAIT || 6500));
 });
 await shot("8-machine", "#/machine");
-await shot("10-jobs", "#/jobs");
+await shot("10-activity", "#/activity");
 await shot("7-new", "#/new", async () => {
   await click("button", "Upload files");
   await sleep(200);

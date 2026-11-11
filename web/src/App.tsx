@@ -17,7 +17,7 @@ import { UseWrite } from "./components/UseWrite";
 import { WriteView } from "./components/WriteView";
 import { ErrorNote, cx, isRunning } from "./components/ui";
 
-type Section = "home" | "write" | "styles" | "new" | "jobs" | "benchmark" | "machine";
+type Section = "home" | "write" | "styles" | "new" | "activity" | "benchmark" | "machine";
 interface Route {
   section: Section;
   id?: string;
@@ -31,7 +31,7 @@ function parseHash(hash: string): Route {
   if (parts.length === 0) return { section: "home" };
   if (parts[0] === "write") return { section: "write" };
   if (parts[0] === "benchmark") return { section: "benchmark" };
-  if (parts[0] === "jobs") return { section: "jobs" };
+  if (parts[0] === "activity" || parts[0] === "jobs") return { section: "activity" };
   if (parts[0] === "machine") return { section: "machine" };
   if (parts[0] === "new") return { section: "new" };
   if (parts[0] === "styles" && parts[1]) {
@@ -74,7 +74,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { section: "new", label: "New style", icon: <UserRoundPlus className="size-4" aria-hidden />, href: "#/new" },
       { section: "styles", label: "Styles", icon: <UsersRound className="size-4" aria-hidden />, href: "#/styles" },
-      { section: "jobs", label: "Jobs", icon: <Activity className="size-4" aria-hidden />, href: "#/jobs" },
+      { section: "activity", label: "Activity", icon: <Activity className="size-4" aria-hidden />, href: "#/activity" },
       { section: "benchmark", label: "Benchmark", icon: <Scale className="size-4" aria-hidden />, href: "#/benchmark" },
       { section: "machine", label: "Machine", icon: <Cpu className="size-4" aria-hidden />, href: "#/machine" },
     ],
@@ -164,7 +164,7 @@ export default function App() {
         </nav>
         <div className="mt-auto space-y-3 px-1">
           {liveLine && (
-            <a href="#/jobs" className="flex items-center gap-2 rounded-(--radius-control) bg-accent-soft px-2.5 py-2 text-xs font-medium text-accent hover:bg-accent/15 dark:text-accent-hover">
+            <a href="#/activity" className="flex items-center gap-2 rounded-(--radius-control) bg-accent-soft px-2.5 py-2 text-xs font-medium text-accent hover:bg-accent/15 dark:text-accent-hover">
               <Activity className="size-3.5 shrink-0 animate-pulse" aria-hidden />
               <span className="truncate">{liveLine}</span>
             </a>
@@ -232,7 +232,7 @@ export default function App() {
           )}
 
           {route.section === "machine" && <Machine />}
-          {route.section === "jobs" && <Jobs />}
+          {route.section === "activity" && <Jobs />}
         </div>
       </main>
     </div>
