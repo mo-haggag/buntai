@@ -56,7 +56,7 @@ def div_by_class(page: str, cls: str) -> str | None:
 
 
 def extract_post(page: str) -> dict:
-    title = re.search(r"(?is)<title>(.*?)</title>", page)
+    title = re.search(r"(?is)<title[^>]*>(.*?)</title>", page)
     title = html.unescape(title.group(1)).strip() if title else ""
     body = div_by_class(page, "posthaven-post-body")
     if body is None:
@@ -69,7 +69,10 @@ def extract_post(page: str) -> dict:
     date = re.search(r'(?is)<time[^>]*datetime="([^"]+)"', page) or re.search(
         r'(?is)class="posthaven-formatted-date"[^>]*data-unix-time="(\d+)"', page
     )
-    return {"title": title, "date": date.group(1) if date else "", "text": strip_tags(body)}
+    paras = strip_tags(body).split("\n\n")
+    while paras and len(paras[0].split()) < 12:  # subtitles, bylines, dates, share counts above the first sentence
+        paras.pop(0)
+    return {"title": title, "date": date.group(1) if date else "", "text": "\n\n".join(paras)}
 
 
 def post_links(page: str, base: str) -> list[str]:
@@ -99,6 +102,70 @@ def crawl_paginated(base: str, max_pages: int = 300) -> list[str]:
     return list(seen)
 
 
+NOT_POSTS = re.compile(r"(?i)/(tag|tags|category|categories|author|authors|page|feed|search|archive|about|"
+                       r"privacy|terms|subscribe|comments|podcast|recommendations|leaderboard|people|wp-content)(/|$)")
+
+
+def crawl_sitemap(base: str, limit: int = 2000) -> list[str]:
+    """Post URLs from the site's sitemap (Substack, WordPress, Ghost and most static generators)."""
+    host = urlparse(base).netloc
+    queue = [base + p for p in ("/sitemap.xml", "/sitemap_index.xml", "/wp-sitemap.xml")]
+    seen_maps: set[str] = set()
+    urls: dict[str, None] = {}
+    while queue and len(urls) < limit:
+        sm = queue.pop(0)
+        if sm in seen_maps:
+            continue
+        seen_maps.add(sm)
+        try:
+            xml = fetch(sm)
+        except Exception:
+            continue
+        for loc in re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", xml):
+            loc = html.unescape(loc)
+            if re.search(r"(?i)sitemap[^/]*\.xml", loc):
+                if not any(k in loc.lower() for k in ("tag", "categor", "author", "page")):
+                    queue.append(loc)
+                continue
+            p = urlparse(loc)
+            if p.netloc.replace("www.", "") == host.replace("www.", "") and p.path.strip("/") and not NOT_POSTS.search(p.path):
+                urls[loc.rstrip("/")] = None
+        print("sitemap %s: %d posts so far" % (sm, len(urls)), file=sys.stderr)
+    return list(urls)[:limit]
+
+
+def crawl_feed(base: str) -> list[str]:
+    """Item links from an RSS or Atom feed: usually only the newest 10 to 50 posts."""
+    for path in ("/feed", "/rss", "/posts.atom", "/atom.xml", "/rss.xml", "/feed.xml", "/index.xml"):
+        try:
+            xml = fetch(base + path)
+        except Exception:
+            continue
+        links = re.findall(r"<item>.*?<link>\s*([^<\s]+)\s*</link>", xml, re.S)
+        links += re.findall(r'<entry>.*?<link[^>]*href="([^"]+)"', xml, re.S)
+        if links:
+            return list(dict.fromkeys(html.unescape(l).rstrip("/") for l in links))
+    return []
+
+
+def discover(base: str) -> list[str]:
+    """Index pages first; a sitemap when the blog has no ?page=N index; a feed as the last resort."""
+    try:
+        found = crawl_paginated(base)
+    except Exception as e:
+        print("no ?page=N index: %s" % e, file=sys.stderr)
+        found = []
+    if len(found) >= 20:
+        return found
+    for fn in (crawl_sitemap, crawl_feed):
+        more = fn(base)
+        if len(more) > len(found):
+            found = more
+        if len(found) >= 20:
+            break
+    return found
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--voice", required=True)
@@ -110,7 +177,8 @@ def main() -> None:
     if a.urls:
         urls = [l.strip() for l in open(a.urls) if l.strip()]
     else:
-        urls = crawl_paginated(a.source.rstrip("/"))
+        urls = discover(a.source.rstrip("/"))
+    print("found %d candidate posts" % len(urls), file=sys.stderr)
 
     def one(u: str) -> dict | None:
         try:
