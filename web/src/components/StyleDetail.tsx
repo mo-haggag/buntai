@@ -172,7 +172,7 @@ function Overview({ voice }: { voice: Voice }) {
           </div>
           {progressFor(1) && <Progress progress={progressFor(1)!} />}
         </Step>
-        <Step n={3} title="Train" icon={<Cpu />} status={st[2]} last={false} aside={voice.train?.total_steps ? `Step ${fmtInt(voice.train.steps.at(-1)?.step ?? 0)} / ${fmtInt(voice.train.total_steps)}` : undefined}>
+        <Step n={3} title="Train" icon={<Cpu />} status={st[2]} last={false} aside={st[2] !== "waiting" && voice.train?.total_steps ? `Step ${fmtInt(voice.train.steps.at(-1)?.step ?? 0)} / ${fmtInt(voice.train.total_steps)}` : undefined}>
           <TrainSummary voice={voice} />
         </Step>
         <Step n={4} title="Evaluate" icon={<Gauge />} status={st[3]} last>
