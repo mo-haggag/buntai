@@ -54,6 +54,23 @@ def is_transcript(post: dict) -> bool:
     return sum(bool(SPEAKER_LINE.match(p)) for p in paras) >= max(3, len(paras) // 6)
 
 
+TIMESTAMP_LINE = re.compile(r"^\s*\(?\d{1,2}:\d{2}(:\d{2})?\)?\s")
+TRANSCRIPT_START = re.compile(r"(?i)^(full )?transcript( below)?[:.]?\s*$")
+
+
+def prose_only(text: str) -> str:
+    """The author's own prose from a post: show-notes timestamps are dropped, and the post is cut at the
+    point where a transcript or a speaker-labelled exchange begins."""
+    out = []
+    for p in text.split("\n\n"):
+        if SPEAKER_LINE.match(p) or TRANSCRIPT_START.match(p):
+            break
+        if TIMESTAMP_LINE.match(p):
+            continue
+        out.append(p)
+    return "\n\n".join(out)
+
+
 def passages(text: str, lo: int = 120, hi: int = 380) -> list[str]:
     """Group whole paragraphs into passages of lo..hi words; paragraphs are never split."""
     out, cur, n = [], [], 0
@@ -137,7 +154,7 @@ def main() -> None:
     items = []
     for p in kept:
         split = "eval" if in_eval(p["url"], a.eval_frac) else "train"
-        for i, psg in enumerate(passages(clean(p["text"]))):
+        for i, psg in enumerate(passages(prose_only(clean(p["text"])))):
             if "\ufffd" in psg:  # undecodable characters from the crawl: not the author's text
                 continue
             items.append({"split": split, "url": p["url"], "title": p["title"], "i": i, "passage": psg})
