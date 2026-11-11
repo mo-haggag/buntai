@@ -13,7 +13,17 @@ Demo styles: Garry Tan ([blog.garrytan.com](https://blog.garrytan.com)), Sam Alt
 
 Trained on one laptop (RTX 5090 Laptop GPU, 24 GB). "Judge" is a blind test: for 20 held-out requests, the base model, the tuned model and GPT-5.5 (asked to imitate the author) each write a passage, and gpt-5.4 picks the one whose voice is closest to the author's real passage. Each request is judged twice with the candidates in different orders. Perplexity is measured on the author's real held-out passages, from posts the model never saw; lower means the writing is more predictable to the model.
 
-RESULTS_TABLE
+| Style | Corpus | Judge: base / GPT-5.5 / tuned (of 40) | Held-out perplexity: base to tuned | Best epoch | Training time |
+|---|---|---|---|---|---|
+| Garry Tan | 386 posts, 161K words, 762 pairs | 0 / 14 / **26** | 18.9 to **11.5** (39% lower) | 2 of 2 | 5 min 45 s |
+| Sam Altman | 121 posts, 113K words, 478 pairs | 0 / **28** / 12 | 17.9 to **10.0** (44% lower) | 1 of 4 | 8 min 27 s |
+| Paul Graham | PG_ROW |
+
+How to read it:
+
+- **Garry Tan:** the owned 4B beat GPT-5.5 about 2 to 1 on voice, with a judge from GPT's own family. His style is idiosyncratic (link posts, "Picture this…", first-person asides), which is where an adapter has the most to add.
+- **Sam Altman:** GPT-5.5 won. His prose is plain and analytical, a register GPT-5.5 already writes well, and the best epoch was epoch 1, only 60 optimizer steps on 478 pairs. Later epochs memorised the data (held-out perplexity 9.96, 11.68, 15.32, 17.54 after epochs 1 to 4), so the trainer kept epoch 1. More data or a lower learning rate is the next step for small corpora.
+- **The base model never wins.** Untrained Qwen3-VL-4B writes with bold headers, emoji bullets and hashtags; neither judge nor perplexity ever prefers it.
 
 What keeps the numbers honest:
 
