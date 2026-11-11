@@ -298,6 +298,7 @@ async def run_pipeline(vid: str, skip: tuple[str, ...] = (), continue_from: str 
                 async with gpu.lock:
                     gpu.unload()
                     gpu.busy = vid
+                progress[vid] = {"label": {"train": "Training", "eval": "Evaluating"}[stage], "done": 0, "total": 0}
             if stage == "train":
                 training_run[vid] = rid
             proc = None
