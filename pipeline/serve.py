@@ -726,7 +726,17 @@ async def download_model(req: web.Request) -> web.Response:
     return web.json_response({"id": mid, "started": True})
 
 
+def reconcile_stages() -> None:
+    """After a restart no job is running, so a stage file left at collect/build/train/eval is stale."""
+    for vid in load_voices():
+        st = read_json(RUNS / vid / "stage.json", {}) or {}
+        if st.get("stage") in ("collect", "build", "train", "eval"):
+            set_stage(vid, "ready" if adapter_path(vid) else "idle")
+            log_job(voice=vid, stage=st["stage"], event="end", ok=False, note="interrupted by a restart")
+
+
 def make_app() -> web.Application:
+    reconcile_stages()
     app = web.Application(client_max_size=64 * 1024 * 1024)
     app.add_routes(routes)
     dist = ROOT / "web" / "dist"

@@ -109,7 +109,7 @@ export default function App() {
   const liveLine = live.length
     ? live.length === 1
       ? `${{ collect: "Collecting", build: "Building", train: "Training", eval: "Evaluating" }[live[0].stage as "collect"]} ${live[0].name}${live[0].progress && live[0].progress.total ? ` · ${Math.round((live[0].progress.done / live[0].progress.total) * 100)}%` : ""}`
-      : `${live.length} jobs running`
+      : `${live.length} running`
     : null;
 
   useEffect(() => {
