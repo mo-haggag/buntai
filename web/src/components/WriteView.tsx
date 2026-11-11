@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CircleAlert, PenLine, Sparkles, Square } from "lucide-react";
+import { CircleAlert, Scale, Square } from "lucide-react";
 import { api } from "../api";
 import type { Mode, Voice } from "../api";
 import { BASE_MODEL, FRONTIER_LABEL } from "../brand";
@@ -70,7 +70,7 @@ export function WriteView({ voices }: { voices: Voice[] }) {
     return (
       <div className="space-y-6">
         <PageHeader title="Benchmark" />
-        <EmptyState icon={<PenLine className="size-6" />} title="No trained styles yet">
+        <EmptyState icon={<Scale className="size-6" />} title="No trained styles yet">
           <Button className="mt-2" onClick={() => (window.location.hash = "#/styles")}>
             Go to Styles
           </Button>
@@ -203,8 +203,8 @@ export function WriteView({ voices }: { voices: Voice[] }) {
             </Button>
           ) : (
             <Button variant="primary" onClick={generate} disabled={!prompt.trim()}>
-              <Sparkles className="size-4" aria-hidden />
-              Generate
+              <Scale className="size-4" aria-hidden />
+              Compare
             </Button>
           )}
         </div>

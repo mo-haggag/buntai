@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Copy, PenLine, Pencil, RotateCcw, Sparkles, Square } from "lucide-react";
+import { Check, Copy, RotateCcw, Square, SquarePen, TextCursor } from "lucide-react";
 import { api } from "../api";
 import type { Voice } from "../api";
 import { Markdown } from "./Markdown";
@@ -76,7 +76,7 @@ export function UseWrite({ voices, busy }: { voices: Voice[]; busy: string | nul
     return (
       <div className="space-y-6">
         <PageHeader title="Write" />
-        <EmptyState icon={<PenLine className="size-6" />} title="No trained style yet">
+        <EmptyState icon={<SquarePen className="size-6" />} title="No trained style yet">
           <Button className="mt-2" onClick={() => (window.location.hash = "#/new")}>
             Train one
           </Button>
@@ -200,7 +200,7 @@ export function UseWrite({ voices, busy }: { voices: Voice[]; busy: string | nul
               </Button>
             ) : (
               <Button variant="primary" className="w-full" onClick={generate} disabled={!brief.trim() || !!busy}>
-                <Sparkles className="size-4" aria-hidden />
+                <SquarePen className="size-4" aria-hidden />
                 {status === "done" || status === "error" ? "Write again" : "Write"}
               </Button>
             )}
@@ -245,7 +245,7 @@ export function UseWrite({ voices, busy }: { voices: Voice[]; busy: string | nul
             </div>
             <div className="flex items-center gap-1.5">
               <Button variant="ghost" className="h-8 px-2.5" onClick={() => setEditing((e) => !e)} disabled={!text || status === "writing"} title={editing ? "Done editing" : "Edit"}>
-                {editing ? <Check className="size-4" aria-hidden /> : <Pencil className="size-4" aria-hidden />}
+                {editing ? <Check className="size-4" aria-hidden /> : <TextCursor className="size-4" aria-hidden />}
                 {editing ? "Done" : "Edit"}
               </Button>
               <Button variant="ghost" className="h-8 px-2.5" onClick={copy} disabled={!text} title="Copy as markdown">

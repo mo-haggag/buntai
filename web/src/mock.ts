@@ -1,5 +1,5 @@
 // In-memory fake backend, used when the page is opened with ?mock=1.
-import type { Api, DataView, GenEvent, GenRequest, Machine, Run, Sample, Voice } from "./api";
+import type { Api, DataView, GenEvent, GenRequest, Jobs, Machine, Run, Sample, Voice } from "./api";
 
 const sleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
@@ -284,6 +284,19 @@ export const mockApi: Api = {
         { id: "qwen3vl-4b", repo: "Qwen/Qwen3-VL-4B-Instruct", params: "4B", size_gb: 8.9, train_vram_gb: 15, serve_vram_gb: 9, present: true, active: true, size_on_disk_gb: 8.9, fits_training: true, fits_serving: true, recommended: true, download: null },
         { id: "qwen3vl-8b", repo: "Qwen/Qwen3-VL-8B-Instruct", params: "8B", size_gb: 17, train_vram_gb: 23, serve_vram_gb: 17, present: false, active: false, size_on_disk_gb: 0, fits_training: false, fits_serving: true, recommended: false, download: null },
       ],
+    };
+  },
+  async getJobs(): Promise<Jobs> {
+    await sleep(60);
+    const live = allVoices().filter((v) => ["collect", "build", "train", "eval"].includes(v.stage));
+    return {
+      active: live.map((v) => ({ voice: v.id, name: v.name, stage: v.stage, progress: v.progress, since: Date.now() / 1000 - 40, run: null })),
+      queued: [],
+      recent: [
+        { voice: "garry", name: "Garry Tan", stage: "eval", at: Date.now() / 1000 - 900, ok: true, seconds: 312 },
+        { voice: "garry", name: "Garry Tan", stage: "train", at: Date.now() / 1000 - 1300, ok: true, seconds: 690 },
+      ],
+      gpu_busy: live[0]?.id ?? null,
     };
   },
   async downloadModel(id) {

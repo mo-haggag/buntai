@@ -1,4 +1,4 @@
-import { ArrowRight, Library, Microchip, PenLine, WandSparkles } from "lucide-react";
+import { ArrowRight, Cpu, SquarePen, UserRoundPlus, UsersRound } from "lucide-react";
 import type { ReactNode } from "react";
 import type { Voice } from "../api";
 import { APP_NAME } from "../brand";
@@ -26,14 +26,14 @@ export function Home({ voices, busy }: { voices: Voice[]; busy: string | null })
       <div className="grid gap-4 sm:grid-cols-3">
         <Choice
           href="#/new"
-          icon={<WandSparkles className="size-5" aria-hidden />}
+          icon={<UserRoundPlus className="size-5" aria-hidden />}
           title="Train a style"
           sub="From a blog, files or pasted text. About ten minutes."
           primary={ready.length === 0}
         />
         <Choice
           href="#/write"
-          icon={<PenLine className="size-5" aria-hidden />}
+          icon={<SquarePen className="size-5" aria-hidden />}
           title="Write"
           sub={ready.length ? `As ${ready.map((v) => v.name).slice(0, 3).join(", ")}${ready.length > 3 ? " and more" : ""}.` : "Needs a trained style first."}
           primary={ready.length > 0}
@@ -41,19 +41,19 @@ export function Home({ voices, busy }: { voices: Voice[]; busy: string | null })
         />
         <Choice
           href="#/machine"
-          icon={<Microchip className="size-5" aria-hidden />}
+          icon={<Cpu className="size-5" aria-hidden />}
           title="Machine"
           sub={busy ? `Training ${busy} now.` : "The GPU, disk and base models."}
         />
       </div>
 
       {(voices.length > 0 || drafts.length > 0) && (
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className={cx("grid gap-6", voices.length > 0 && drafts.length > 0 && "md:grid-cols-2")}>
           {voices.length > 0 && (
             <section className="space-y-3">
               <div className="flex items-center justify-between">
                 <h2 className="flex items-center gap-2 font-semibold">
-                  <Library className="size-4 text-ink-2" aria-hidden />
+                  <UsersRound className="size-4 text-ink-2" aria-hidden />
                   Styles
                 </h2>
                 <a href="#/styles" className="text-sm text-ink-2 hover:text-ink">
@@ -77,7 +77,7 @@ export function Home({ voices, busy }: { voices: Voice[]; busy: string | null })
           {drafts.length > 0 && (
             <section className="space-y-3">
               <h2 className="flex items-center gap-2 font-semibold">
-                <PenLine className="size-4 text-ink-2" aria-hidden />
+                <SquarePen className="size-4 text-ink-2" aria-hidden />
                 Recent drafts
               </h2>
               <Card className="divide-y divide-line">

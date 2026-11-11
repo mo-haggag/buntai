@@ -56,6 +56,7 @@ async function shot(name, hash, actions = async () => {}, wait = 1800) {
 
 const click = (sel, text) => evalJs(`(() => { const els = [...document.querySelectorAll(${JSON.stringify(sel)})].filter(e => e.offsetParent !== null); const el = els.find(e => e.textContent.trim().includes(${JSON.stringify(text)})); if (el) el.click(); return !!el; })()`);
 
+await shot("9-start", "#/");
 await shot("1-styles", "#/styles");
 await shot("2-overview", `#/styles/${style}/overview`);
 await shot("3-data", `#/styles/${style}/data`);
@@ -67,9 +68,19 @@ await shot("5-evaluation", `#/styles/${style}/evaluation`, async () => {
 await shot("6-benchmark", "#/benchmark", async () => {
   await click("button", "Talk to users weekly");
   await sleep(100);
+  await evalJs(`(() => {  // pick a second style in "Compare with", if the page offers one
+    const sel = [...document.querySelectorAll("select")][1];
+    if (!sel) return false;
+    const opt = [...sel.options].find((o) => o.value);
+    if (!opt) return false;
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(sel, opt.value);
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  })()`);
+  await sleep(100);
   await click("[role=switch]", "GPT-5.5");
   await sleep(100);
-  await click("button", "Generate");
+  await click("button", "Compare");
   await sleep(Number(process.env.WRITE_WAIT || 6500));
 });
 await shot("0-write", "#/write", async () => {
@@ -85,6 +96,7 @@ await shot("0-write", "#/write", async () => {
   await sleep(Number(process.env.WRITE_WAIT || 6500));
 });
 await shot("8-machine", "#/machine");
+await shot("10-jobs", "#/jobs");
 await shot("7-new", "#/new", async () => {
   await click("button", "Upload files");
   await sleep(200);

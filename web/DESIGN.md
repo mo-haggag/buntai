@@ -26,7 +26,33 @@ System font stack. Sizes used: 12px (`text-xs`) for labels and metadata, 14px (`
 
 ## Shell
 
-A side rail with Start at the top, then two groups: Use (Write) and Train (New style, Styles, Benchmark, Machine). Start asks what you want to do; it is the only screen with no nav group. Use screens show one output and no numbers. Train screens show comparisons, numbers and the machine. Nothing from one group appears in the other.
+A side rail with Start at the top, then two groups: Use (Write) and Train (New style, Styles, Jobs, Benchmark, Machine). While anything runs, a live line at the foot of the rail names it and links to Jobs. Start asks what you want to do; it is the only screen with no nav group. Use screens show one output and no numbers. Train screens show comparisons, numbers and the machine. Nothing from one group appears in the other.
+
+## Iconography
+
+One family (lucide), one stroke weight. Sizes: 16 px (`size-4`) in the rail, buttons and labels; 20 px (`size-5`) on Start cards; 12 px (`size-3`) inside badges. One concept has one icon wherever it appears, and no two concepts share a silhouette class.
+
+| Concept | Icon | Where |
+|---|---|---|
+| Brand | `Feather` | the logo only |
+| Start | `House` | rail |
+| Write (use a style) | `SquarePen` | rail, Start, "Write with it", the Write button |
+| Styles (each is a person) | `UsersRound` | rail, lists |
+| New style | `UserRoundPlus` | rail, Start, buttons |
+| Jobs, something running | `Activity` | rail, the live line at the foot of the rail |
+| Benchmark, judging | `Scale` | rail, Compare button |
+| Machine, GPU | `Cpu` | rail, Start, GPU panel |
+| Collect, download | `Download` | pipeline step, model downloads |
+| Build pairs | `Layers` | pipeline step |
+| Train | `Dumbbell` | pipeline step; Retrain and Continue add `RefreshCw` / `Play` |
+| Evaluate | `Gauge` | pipeline step |
+| The author's words | `Quote` | real passages |
+| Blind test | `EyeOff` | Evaluation |
+| Writing as material | `FileText`, `FilePlus2`, `Upload`, `ClipboardPaste`, `Globe` | sources, Add writing |
+| Edit text | `TextCursor` | the draft toolbar (never a pen: pens mean Write) |
+| Copy, Again, Stop, Done | `Copy`, `RotateCcw`, `Square`, `Check` | the draft toolbar |
+| Disk, base models | `HardDrive`, `Package` | Machine |
+| State | `Check`, `CircleAlert`, `LoaderCircle` | badges and steps |
 
 ## Rules
 

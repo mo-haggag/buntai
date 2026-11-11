@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { ArrowDown, Check, CircleAlert, Cpu, Download, ExternalLink, FilePlus2, FileText, Gauge, Layers, PenLine, Play, RefreshCw } from "lucide-react";
+import { ArrowDown, Check, CircleAlert, Download, Dumbbell, ExternalLink, EyeOff, FilePlus2, FileText, Gauge, Layers, Play, RefreshCw, SquarePen } from "lucide-react";
 import { api } from "../api";
 import type { DataView, Judge, Run, Sample, Voice } from "../api";
 import { BASE_MODEL, FRONTIER_LABEL } from "../brand";
@@ -30,6 +30,7 @@ import {
 export type DetailTab = "overview" | "data" | "training" | "evaluation";
 
 type StepKey = "collect" | "build" | "train" | "eval";
+const idle = (v: Voice) => !["ready", "error", "idle"].includes(v.stage);
 type Status = "done" | "running" | "waiting" | "failed";
 const ORDER: StepKey[] = ["collect", "build", "train", "eval"];
 
@@ -110,24 +111,10 @@ export function StyleDetail({
         }
         actions={
           voice.stage === "ready" && (
-            <>
-              <Button onClick={() => (window.location.hash = `#/new?add=${encodeURIComponent(voice.id)}`)} title="More files, text or a URL, then train again">
-                <FilePlus2 className="size-4" aria-hidden />
-                Add writing
-              </Button>
-              <Button onClick={() => api.rerun(voice.id, "train", { continue: true }).then(() => api.getVoice(voice.id)).then(onUpdate)} title="Resume from the current adapter">
-                <Play className="size-4" aria-hidden />
-                Continue training
-              </Button>
-              <Button onClick={() => api.rerun(voice.id, "train").then(() => api.getVoice(voice.id)).then(onUpdate)} title="A fresh run on the same data">
-                <RefreshCw className="size-4" aria-hidden />
-                Retrain
-              </Button>
-              <Button variant="primary" onClick={() => (window.location.hash = `#/write?style=${encodeURIComponent(voice.id)}`)}>
-                <PenLine className="size-4" aria-hidden />
-                Write with it
-              </Button>
-            </>
+            <Button variant="primary" onClick={() => (window.location.hash = `#/write?style=${encodeURIComponent(voice.id)}`)}>
+              <SquarePen className="size-4" aria-hidden />
+              Write as {voice.name}
+            </Button>
           )
         }
       />
@@ -186,7 +173,7 @@ function Overview({ voice }: { voice: Voice }) {
           </div>
           {progressFor(1) && <Progress progress={progressFor(1)!} />}
         </Step>
-        <Step n={3} title="Train" icon={<Cpu />} status={st[2]} last={false} aside={st[2] !== "waiting" && voice.train?.total_steps ? `Step ${fmtInt(voice.train.steps.at(-1)?.step ?? 0)} / ${fmtInt(voice.train.total_steps)}` : undefined}>
+        <Step n={3} title="Train" icon={<Dumbbell />} status={st[2]} last={false} aside={st[2] !== "waiting" && voice.train?.total_steps ? `Step ${fmtInt(voice.train.steps.at(-1)?.step ?? 0)} / ${fmtInt(voice.train.total_steps)}` : undefined}>
           <TrainSummary voice={voice} />
         </Step>
         <Step n={4} title="Evaluate" icon={<Gauge />} status={st[3]} last>
@@ -314,35 +301,39 @@ function DataTab({ voice }: { voice: Voice }) {
         <Stat label="Held out" value={data.eval !== undefined ? fmtInt(data.eval) : "-"} sub="whole posts, never trained on" />
       </Card>
 
-      {(dirty || excluded.size > 0) && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-(--radius-card) border border-line bg-surface px-4 py-3 text-sm">
-          <span className="text-ink-2">
-            {fmtInt(excluded.size)} post{excluded.size === 1 ? "" : "s"} excluded{dirty ? ". Rebuild to apply." : "."}
-          </span>
-          <Button variant="primary" onClick={rebuild} disabled={busy || voice.stage !== "ready" && voice.stage !== "error" && voice.stage !== "idle"}>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-(--radius-card) border border-line bg-surface px-4 py-3 text-sm">
+        <span className="text-ink-2">
+          {excluded.size > 0 ? `${fmtInt(excluded.size)} post${excluded.size === 1 ? "" : "s"} excluded${dirty ? ". Rebuild to apply." : "."}` : "Add more of the author's writing, or exclude posts below, then rebuild."}
+        </span>
+        <div className="flex gap-2">
+          <Button onClick={() => (window.location.hash = `#/new?add=${encodeURIComponent(voice.id)}`)} disabled={idle(voice)} title="Files, pasted text or a URL">
+            <FilePlus2 className="size-4" aria-hidden />
+            Add writing
+          </Button>
+          <Button variant={dirty ? "primary" : "secondary"} onClick={rebuild} disabled={busy || idle(voice)}>
             <RefreshCw className={cx("size-4", busy && "animate-spin")} aria-hidden />
             Rebuild and retrain
           </Button>
         </div>
-      )}
+      </div>
 
       {data.pairs.length > 0 && (
         <section className="space-y-3">
           <h2 className="font-semibold">What the model trains on</h2>
           <div className="text-sm text-ink-2">A passage in the author's words, behind two requests an LLM wrote for it. The requests describe content only.</div>
           <div className="grid gap-4 lg:grid-cols-2">
-            {data.pairs.slice(0, 4).map((p, i) => (
+            {data.pairs.slice(0, 2).map((p, i) => (
               <Card key={i} className="flex flex-col">
                 <div className="space-y-2 border-b border-line px-4 py-3">
                   {p.requests.map((r, j) => (
                     <div key={j} className="flex gap-2 text-sm">
-                      <span className="mt-0.5 shrink-0 rounded-full bg-sunken px-1.5 text-[11px] font-medium text-ink-3">{j === 0 ? "detailed" : "one line"}</span>
-                      <span className="text-ink-2">{r}</span>
+                      <span className="mt-0.5 h-5 shrink-0 rounded-full bg-sunken px-1.5 text-[11px] leading-5 font-medium text-ink-3">{j === 0 ? "detailed" : "one line"}</span>
+                      <span className={cx("text-ink-2", j === 0 && "line-clamp-3")}>{r}</span>
                     </div>
                   ))}
                 </div>
                 <div className="px-4 py-3">
-                  <Paragraphs text={p.passage} className="text-sm" />
+                  <div className="line-clamp-[8] text-sm leading-relaxed whitespace-pre-line">{p.passage}</div>
                   <div className="mt-2 truncate text-xs text-ink-3">{p.title}</div>
                 </div>
               </Card>
@@ -354,7 +345,7 @@ function DataTab({ voice }: { voice: Voice }) {
       <section className="space-y-3">
         <h2 className="font-semibold">Posts</h2>
         <div className="text-sm text-ink-2">Exclude anything that isn't the author's own prose, then rebuild.</div>
-        <Card className="divide-y divide-line">
+        <Card className="max-h-[440px] divide-y divide-line overflow-auto">
           {posts.map((p) => {
             const off = excluded.has(p.url);
             return (
@@ -418,15 +409,30 @@ function TrainingTab({ voice, onUpdate }: { voice: Voice; onUpdate: (v: Voice) =
       setBusy(null);
     }
   };
+  const cont = async () => {
+    setBusy("continue");
+    try {
+      await api.rerun(voice.id, "train", { continue: true });
+      onUpdate(await api.getVoice(voice.id));
+    } finally {
+      setBusy(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm text-ink-2">LoRA rank 16 on every attention and MLP projection of {BASE_MODEL}. Up to 4 epochs; the epoch with the lowest held-out perplexity is kept.</div>
-        <Button onClick={retrain} disabled={busy !== null || voice.stage !== "ready"}>
-          <RefreshCw className={cx("size-4", busy === "retrain" && "animate-spin")} aria-hidden />
-          Train again
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={cont} disabled={busy !== null || voice.stage !== "ready" || !voice.active_run} title="Two more epochs from the current adapter, at a lower learning rate">
+            <Play className="size-4" aria-hidden />
+            Continue training
+          </Button>
+          <Button onClick={retrain} disabled={busy !== null || voice.stage !== "ready"} title="A fresh run on the same data">
+            <RefreshCw className={cx("size-4", busy === "retrain" && "animate-spin")} aria-hidden />
+            Train again
+          </Button>
+        </div>
       </div>
 
       {t && t.total_steps > 0 && (
@@ -539,7 +545,10 @@ function EvaluationTab({ voice }: { voice: Voice }) {
 
       {samples && samples.length > 0 && (
         <section className="space-y-3">
-          <h2 className="font-semibold">Blind test</h2>
+          <h2 className="flex items-center gap-2 font-semibold">
+            <EyeOff className="size-4 text-ink-2" aria-hidden />
+            Blind test
+          </h2>
           <div className="text-sm text-ink-2">Held-out requests. Pick which output sounds like {voice.name}, then see the author's real passage.</div>
           <BlindTest voice={voice} samples={samples} />
         </section>

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Columns3, Feather, House, Laptop, Library, Microchip, Monitor, Moon, PenLine, Sun, WandSparkles } from "lucide-react";
+import { Activity, Cpu, Feather, House, Laptop, Monitor, Moon, Scale, SquarePen, Sun, UserRoundPlus, UsersRound } from "lucide-react";
 import { api, isMock } from "./api";
 import type { Voice } from "./api";
 import { APP_NAME } from "./brand";
 import { useTheme } from "./theme";
 import type { ThemePref } from "./theme";
 import { Home } from "./components/Home";
+import { Jobs } from "./components/Jobs";
 import { Machine } from "./components/Machine";
 import { NewStyle } from "./components/NewStyle";
 import { StyleDetail } from "./components/StyleDetail";
@@ -16,7 +17,7 @@ import { UseWrite } from "./components/UseWrite";
 import { WriteView } from "./components/WriteView";
 import { ErrorNote, cx, isRunning } from "./components/ui";
 
-type Section = "home" | "write" | "styles" | "new" | "benchmark" | "machine";
+type Section = "home" | "write" | "styles" | "new" | "jobs" | "benchmark" | "machine";
 interface Route {
   section: Section;
   id?: string;
@@ -30,6 +31,7 @@ function parseHash(hash: string): Route {
   if (parts.length === 0) return { section: "home" };
   if (parts[0] === "write") return { section: "write" };
   if (parts[0] === "benchmark") return { section: "benchmark" };
+  if (parts[0] === "jobs") return { section: "jobs" };
   if (parts[0] === "machine") return { section: "machine" };
   if (parts[0] === "new") return { section: "new" };
   if (parts[0] === "styles" && parts[1]) {
@@ -65,15 +67,16 @@ const START: NavItem = { section: "home", label: "Start", icon: <House className
 const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "Use",
-    items: [{ section: "write", label: "Write", icon: <PenLine className="size-4" aria-hidden />, href: "#/write" }],
+    items: [{ section: "write", label: "Write", icon: <SquarePen className="size-4" aria-hidden />, href: "#/write" }],
   },
   {
     title: "Train",
     items: [
-      { section: "new", label: "New style", icon: <WandSparkles className="size-4" aria-hidden />, href: "#/new" },
-      { section: "styles", label: "Styles", icon: <Library className="size-4" aria-hidden />, href: "#/styles" },
-      { section: "benchmark", label: "Benchmark", icon: <Columns3 className="size-4" aria-hidden />, href: "#/benchmark" },
-      { section: "machine", label: "Machine", icon: <Microchip className="size-4" aria-hidden />, href: "#/machine" },
+      { section: "new", label: "New style", icon: <UserRoundPlus className="size-4" aria-hidden />, href: "#/new" },
+      { section: "styles", label: "Styles", icon: <UsersRound className="size-4" aria-hidden />, href: "#/styles" },
+      { section: "jobs", label: "Jobs", icon: <Activity className="size-4" aria-hidden />, href: "#/jobs" },
+      { section: "benchmark", label: "Benchmark", icon: <Scale className="size-4" aria-hidden />, href: "#/benchmark" },
+      { section: "machine", label: "Machine", icon: <Cpu className="size-4" aria-hidden />, href: "#/machine" },
     ],
   },
 ];
@@ -102,6 +105,12 @@ export default function App() {
 
   const anyRunning = voices.some(isRunning);
   const busy = voices.find((v) => v.stage === "train" || v.stage === "eval")?.name ?? null;
+  const live = voices.filter(isRunning);
+  const liveLine = live.length
+    ? live.length === 1
+      ? `${{ collect: "Collecting", build: "Building", train: "Training", eval: "Evaluating" }[live[0].stage as "collect"]} ${live[0].name}${live[0].progress && live[0].progress.total ? ` · ${Math.round((live[0].progress.done / live[0].progress.total) * 100)}%` : ""}`
+      : `${live.length} jobs running`
+    : null;
 
   useEffect(() => {
     refresh();
@@ -154,6 +163,12 @@ export default function App() {
           ))}
         </nav>
         <div className="mt-auto space-y-3 px-1">
+          {liveLine && (
+            <a href="#/jobs" className="flex items-center gap-2 rounded-(--radius-control) bg-accent-soft px-2.5 py-2 text-xs font-medium text-accent hover:bg-accent/15 dark:text-accent-hover">
+              <Activity className="size-3.5 shrink-0 animate-pulse" aria-hidden />
+              <span className="truncate">{liveLine}</span>
+            </a>
+          )}
           {isMock && (
             <span className="inline-block rounded-full border border-line-strong px-2 py-0.5 text-xs font-medium text-ink-3">Mock data</span>
           )}
@@ -217,6 +232,7 @@ export default function App() {
           )}
 
           {route.section === "machine" && <Machine />}
+          {route.section === "jobs" && <Jobs />}
         </div>
       </main>
     </div>

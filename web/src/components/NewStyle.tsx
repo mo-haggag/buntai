@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { FileText, Globe, Type, Upload, X } from "lucide-react";
+import { ClipboardPaste, FileText, Globe, Upload, X } from "lucide-react";
 import { api } from "../api";
 import type { Voice } from "../api";
 import { Button, Card, PageHeader, cx, fmtInt, inputClass, textareaClass } from "./ui";
@@ -10,7 +10,7 @@ type Source = "url" | "files" | "text";
 const SOURCES: { key: Source; label: string; icon: typeof Globe }[] = [
   { key: "url", label: "Blog URL", icon: Globe },
   { key: "files", label: "Upload files", icon: Upload },
-  { key: "text", label: "Paste text", icon: Type },
+  { key: "text", label: "Paste text", icon: ClipboardPaste },
 ];
 
 const ACCEPT = ".txt,.md,.markdown,.docx";

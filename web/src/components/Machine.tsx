@@ -76,7 +76,7 @@ export function Machine() {
                 <Stat label="Temperature" value={`${g.temp_c}°C`} />
               </div>
               <div className="rounded-(--radius-control) bg-sunken px-3 py-2 text-sm text-ink-2">
-                {m.busy ? `Training or evaluating ${m.busy}.` : m.model_loaded ? `${m.base_model} is loaded and ready to write.` : "Idle. The model loads on the first request."}
+                {m.busy ? `Training or evaluating ${m.busy_name ?? m.busy}.` : m.model_loaded ? `${m.base_model} is loaded and ready to write.` : "Idle. The model loads on the first request."}
               </div>
             </>
           ) : (

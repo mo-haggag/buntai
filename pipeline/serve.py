@@ -36,6 +36,14 @@ PORT = int(os.environ.get("OWNVOICE_PORT", "8765"))
 UPLOAD_TYPES = (".txt", ".md", ".markdown", ".docx")
 
 progress: dict[str, dict] = {}       # live progress per voice, in memory only
+stage_started: dict[str, float] = {}  # voice -> when its current stage began
+JOBS_LOG = RUNS / "jobs.jsonl"
+
+
+def log_job(**rec) -> None:
+    RUNS.mkdir(parents=True, exist_ok=True)
+    with open(JOBS_LOG, "a") as f:
+        f.write(json.dumps({"at": time.time(), **rec}) + "\n")
 running: set[str] = set()
 training_run: dict[str, str] = {}    # voice -> run id while a run is in progress
 jobs = asyncio.Lock()                # one GPU job (train or eval) at a time
@@ -272,6 +280,8 @@ async def run_pipeline(vid: str, skip: tuple[str, ...] = (), continue_from: str 
             if stage in skip:
                 continue
             set_stage(vid, stage)
+            stage_started[vid] = time.time()
+            log_job(voice=vid, stage=stage, event="start", run=rid)
             progress[vid] = {"label": stage.capitalize(), "done": 0, "total": 0}
             if stage in ("train", "eval") and not held_jobs:
                 progress[vid] = {"label": "Waiting for the GPU", "done": 0, "total": 0}
@@ -298,6 +308,8 @@ async def run_pipeline(vid: str, skip: tuple[str, ...] = (), continue_from: str 
                     if m:
                         progress[vid] = fn(m)
             rc = await proc.wait()
+            log_job(voice=vid, stage=stage, event="end", run=rid, ok=rc == 0,
+                    seconds=round(time.time() - stage_started.get(vid, time.time()), 1), exit=rc)
             if rc != 0:
                 set_stage(vid, "error", "%s failed (exit %d), see runs/%s/pipeline.log" % (stage, rc, vid))
                 return
@@ -310,6 +322,7 @@ async def run_pipeline(vid: str, skip: tuple[str, ...] = (), continue_from: str 
         set_stage(vid, "error", "runner failed: %s" % e)
         logf.write("[runner] %s\n" % e)
     finally:
+        stage_started.pop(vid, None)
         training_run.pop(vid, None)
         if held_jobs:
             gpu.busy = None
@@ -494,6 +507,26 @@ async def activate_run(req: web.Request) -> web.Response:
     return web.json_response({"active": rid})
 
 
+@routes.get("/api/jobs")
+async def list_jobs(_req: web.Request) -> web.Response:
+    """What the machine is doing: the job that holds the GPU, the jobs waiting, and what finished recently."""
+    names = {k: m.get("name", k) for k, m in load_voices().items()}
+    active, queued = [], []
+    for vid in sorted(running):
+        st = read_json(RUNS / vid / "stage.json", {}) or {}
+        item = {"voice": vid, "name": names.get(vid, vid), "stage": st.get("stage"), "progress": progress.get(vid),
+                "since": stage_started.get(vid), "run": training_run.get(vid)}
+        (queued if (progress.get(vid) or {}).get("label") == "Waiting for the GPU" else active).append(item)
+    recent = []
+    if JOBS_LOG.exists():
+        for line in JOBS_LOG.read_text().splitlines()[-200:]:
+            with contextlib.suppress(Exception):
+                r = json.loads(line)
+                if r.get("event") == "end":
+                    recent.append({**r, "name": names.get(r["voice"], r["voice"])})
+    return web.json_response({"active": active, "queued": queued, "recent": list(reversed(recent))[:30], "gpu_busy": gpu.busy})
+
+
 @routes.get("/api/voices/{id}/samples")
 async def samples(req: web.Request) -> web.Response:
     vid = req.match_info["id"]
@@ -631,8 +664,10 @@ def machine_view() -> dict:
     disk_project = shutil.disk_usage(ROOT)
     real_models = (models_dir / MODEL_DIR.name / "model.safetensors")
     disk_models = shutil.disk_usage(real_models.resolve().parent if real_models.exists() else models_dir)
+    names = {k: m.get("name", k) for k, m in load_voices().items()}
     return {
-        "gpu": gpu_, "busy": gpu.busy, "model_loaded": gpu.model is not None, "base_model": MODEL_DIR.name,
+        "gpu": gpu_, "busy": gpu.busy, "busy_name": names.get(gpu.busy, gpu.busy) if gpu.busy else None,
+        "model_loaded": gpu.model is not None, "base_model": MODEL_DIR.name,
         "disk": {"project_free_gb": round(disk_project.free / 1e9, 1), "project_total_gb": round(disk_project.total / 1e9, 1),
                  "models_free_gb": round(disk_models.free / 1e9, 1), "models_total_gb": round(disk_models.total / 1e9, 1)},
         "models": rows,

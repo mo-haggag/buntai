@@ -123,10 +123,38 @@ export interface MachineModel {
 export interface Machine {
   gpu: { name: string; vram_total_mb: number; vram_used_mb: number; util: number; temp_c: number; power_w: number } | null;
   busy: string | null;
+  busy_name?: string | null;
   model_loaded: boolean;
   base_model: string;
   disk: { project_free_gb: number; project_total_gb: number; models_free_gb: number; models_total_gb: number };
   models: MachineModel[];
+}
+
+export interface Job {
+  voice: string;
+  name: string;
+  stage: Stage | null;
+  progress?: Voice["progress"];
+  since?: number | null;
+  run?: string | null;
+}
+
+export interface JobEnd {
+  voice: string;
+  name: string;
+  stage: string;
+  at: number;
+  ok: boolean;
+  seconds?: number;
+  exit?: number;
+  run?: string;
+}
+
+export interface Jobs {
+  active: Job[];
+  queued: Job[];
+  recent: JobEnd[];
+  gpu_busy: string | null;
 }
 
 export type Mode = "base" | "tuned" | "frontier";
@@ -158,6 +186,7 @@ export interface Api {
   rerun(id: string, from: "collect" | "build" | "train" | "eval", opts?: { continue?: boolean }): Promise<{ id: string }>;
   addWriting(id: string, input: Omit<NewVoice, "name">): Promise<{ id: string }>;
   getMachine(): Promise<Machine>;
+  getJobs(): Promise<Jobs>;
   downloadModel(id: string): Promise<{ id: string }>;
   generate(req: GenRequest, signal?: AbortSignal): AsyncGenerator<GenEvent>;
 }
@@ -235,6 +264,7 @@ const httpApi: Api = {
     return getJson<{ id: string }>(`/api/voices/${enc(id)}/add`, { method: "POST", body: form });
   },
   getMachine: () => getJson<Machine>("/api/machine"),
+  getJobs: () => getJson<Jobs>("/api/jobs"),
   downloadModel: (id) =>
     getJson<{ id: string }>("/api/machine/download", {
       method: "POST",
