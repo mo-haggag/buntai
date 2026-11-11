@@ -32,7 +32,7 @@ DATA = ROOT / "data"
 MODEL_DIR = ROOT / "models" / "qwen3vl-4b"
 VOICES_FILE = RUNS / "voices.json"
 PY = sys.executable
-PORT = int(os.environ.get("OWNVOICE_PORT", "8765"))
+PORT = int(os.environ.get("BUNTAI_PORT", "8765"))
 UPLOAD_TYPES = (".txt", ".md", ".markdown", ".docx")
 
 progress: dict[str, dict] = {}       # live progress per voice, in memory only

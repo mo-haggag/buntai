@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 export type ThemePref = "light" | "system" | "dark";
 
-const KEY = "ownvoice-theme";
+const KEY = "buntai-theme";
 const media = window.matchMedia("(prefers-color-scheme: dark)");
 
 function readPref(): ThemePref {

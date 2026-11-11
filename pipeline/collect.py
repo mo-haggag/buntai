@@ -20,7 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
-UA = "Mozilla/5.0 (ownvoice corpus collector)"
+UA = "Mozilla/5.0 (Buntai corpus collector)"
 ROOT = Path(__file__).resolve().parent.parent
 
 
