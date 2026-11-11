@@ -69,7 +69,7 @@ export function WriteView({ voices }: { voices: Voice[] }) {
   if (!ready.length) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Write" />
+        <PageHeader title="Benchmark" />
         <EmptyState icon={<PenLine className="size-6" />} title="No trained styles yet">
           <Button className="mt-2" onClick={() => (window.location.hash = "#/styles")}>
             Go to Styles
@@ -128,7 +128,7 @@ export function WriteView({ voices }: { voices: Voice[] }) {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Write" sub="The same prompt, written by each model. Local styles run on this laptop." />
+      <PageHeader title="Benchmark" sub="The same prompt, written by each model side by side. Local styles run on this laptop." />
 
       <Card className="p-4 sm:p-5">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">

@@ -1,5 +1,5 @@
 // Minimal CDP driver: node shoot.mjs <outdir> <scheme> [baseUrl] [shotNames]
-// Screens: 1-styles, 2-overview, 3-data, 4-training, 5-evaluation, 6-write, 7-new (comma-separated in shotNames).
+// Screens: 0-write, 1-styles, 2-overview, 3-data, 4-training, 5-evaluation, 6-benchmark, 7-new, 8-machine (comma-separated in shotNames).
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -64,7 +64,7 @@ await shot("5-evaluation", `#/styles/${style}/evaluation`, async () => {
   await click("button", "Pick A");
   await sleep(400);
 });
-await shot("6-write", "#/write", async () => {
+await shot("6-benchmark", "#/benchmark", async () => {
   await click("button", "Talk to users weekly");
   await sleep(100);
   await click("[role=switch]", "GPT-5.5");
@@ -72,6 +72,18 @@ await shot("6-write", "#/write", async () => {
   await click("button", "Generate");
   await sleep(Number(process.env.WRITE_WAIT || 6500));
 });
+await shot("0-write", "#/write", async () => {
+  await evalJs(`(() => {
+    const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
+    const ta = document.querySelector("textarea");
+    set.call(ta, "A short post for first-time founders on why talking to users every week matters more than the roadmap.");
+    ta.dispatchEvent(new Event("input", { bubbles: true }));
+  })()`);
+  await sleep(100);
+  await click("button", "Write");
+  await sleep(Number(process.env.WRITE_WAIT || 6500));
+});
+await shot("8-machine", "#/machine");
 await shot("7-new", "#/new", async () => {
   await click("button", "Upload files");
   await sleep(200);

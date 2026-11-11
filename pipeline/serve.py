@@ -522,6 +522,98 @@ async def generate(req: web.Request) -> web.StreamResponse:
     return resp
 
 
+# ---------- the machine: GPU, disk, base models ----------
+
+CATALOG = [
+    {"id": "qwen3vl-2b", "repo": "Qwen/Qwen3-VL-2B-Instruct", "params": "2B", "size_gb": 4.4, "train_vram_gb": 9, "serve_vram_gb": 5},
+    {"id": "qwen3vl-4b", "repo": "Qwen/Qwen3-VL-4B-Instruct", "params": "4B", "size_gb": 8.9, "train_vram_gb": 15, "serve_vram_gb": 9},
+    {"id": "qwen3vl-8b", "repo": "Qwen/Qwen3-VL-8B-Instruct", "params": "8B", "size_gb": 17.0, "train_vram_gb": 23, "serve_vram_gb": 17},
+]
+downloads: dict[str, dict] = {}   # model id -> {"proc", "started", "log"}
+
+
+def gpu_info() -> dict | None:
+    import subprocess
+    try:
+        out = subprocess.run(["nvidia-smi", "--query-gpu=name,memory.total,memory.used,utilization.gpu,temperature.gpu,power.draw",
+                              "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=5).stdout.strip()
+        name, total, used, util, temp, power = [x.strip() for x in out.split(",")]
+        return {"name": name, "vram_total_mb": int(total), "vram_used_mb": int(used), "util": int(util),
+                "temp_c": int(temp), "power_w": float(power)}
+    except Exception:
+        return None
+
+
+def dir_size(p: Path) -> int:
+    total = 0
+    for f in p.rglob("*"):
+        if f.is_file():
+            with contextlib.suppress(OSError):
+                total += os.path.getsize(f)  # follows the symlink to the real weights
+    return total
+
+
+def machine_view() -> dict:
+    import shutil
+    gpu_ = gpu_info()
+    vram = (gpu_ or {}).get("vram_total_mb", 0) / 1024
+    models_dir = ROOT / "models"
+    models_dir.mkdir(exist_ok=True)
+    fits = [m for m in CATALOG if m["train_vram_gb"] <= vram * 0.85]
+    recommended = fits[-1]["id"] if fits else None
+    rows = []
+    for m in CATALOG:
+        d = models_dir / m["id"]
+        present = (d / "config.json").exists() and any(d.glob("*.safetensors"))
+        job = downloads.get(m["id"])
+        status = None
+        if job:
+            rc = job["proc"].poll()
+            status = {"state": "running" if rc is None else ("done" if rc == 0 else "error"),
+                      "downloaded_gb": round(dir_size(d) / 1e9, 2) if d.exists() else 0,
+                      "started": job["started"]}
+        rows.append({**m, "present": present, "active": m["id"] == MODEL_DIR.name,
+                     "size_on_disk_gb": round(dir_size(d) / 1e9, 2) if d.exists() else 0,
+                     "fits_training": m["train_vram_gb"] <= vram * 0.85, "fits_serving": m["serve_vram_gb"] <= vram * 0.9,
+                     "recommended": m["id"] == recommended, "download": status})
+    disk_project = shutil.disk_usage(ROOT)
+    real_models = (models_dir / MODEL_DIR.name / "model.safetensors")
+    disk_models = shutil.disk_usage(real_models.resolve().parent if real_models.exists() else models_dir)
+    return {
+        "gpu": gpu_, "busy": gpu.busy, "model_loaded": gpu.model is not None, "base_model": MODEL_DIR.name,
+        "disk": {"project_free_gb": round(disk_project.free / 1e9, 1), "project_total_gb": round(disk_project.total / 1e9, 1),
+                 "models_free_gb": round(disk_models.free / 1e9, 1), "models_total_gb": round(disk_models.total / 1e9, 1)},
+        "models": rows,
+    }
+
+
+@routes.get("/api/machine")
+async def get_machine(_req: web.Request) -> web.Response:
+    return web.json_response(await asyncio.get_running_loop().run_in_executor(None, machine_view))
+
+
+@routes.post("/api/machine/download")
+async def download_model(req: web.Request) -> web.Response:
+    """Fetch a base model from Hugging Face into models/<id>, in the background, resumable."""
+    import subprocess
+    mid = (await req.json()).get("id", "")
+    m = next((x for x in CATALOG if x["id"] == mid), None)
+    if not m:
+        return web.json_response({"error": "unknown model"}, status=400)
+    job = downloads.get(mid)
+    if job and job["proc"].poll() is None:
+        return web.json_response({"error": "already downloading"}, status=409)
+    (RUNS / "downloads").mkdir(parents=True, exist_ok=True)
+    log = open(RUNS / "downloads" / ("%s.log" % mid), "a")
+    code = ("from huggingface_hub import snapshot_download; "
+            "snapshot_download(%r, local_dir=%r, allow_patterns=['*.json', '*.safetensors', '*.txt', '*.jinja'])"
+            % (m["repo"], str(ROOT / "models" / mid)))
+    env = {**os.environ, "HF_TOKEN": os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_API_KEY", "")}
+    proc = subprocess.Popen([PY, "-c", code], stdout=log, stderr=subprocess.STDOUT, env=env, cwd=str(ROOT))
+    downloads[mid] = {"proc": proc, "started": time.time(), "log": log}
+    return web.json_response({"id": mid, "started": True})
+
+
 def make_app() -> web.Application:
     app = web.Application(client_max_size=64 * 1024 * 1024)
     app.add_routes(routes)

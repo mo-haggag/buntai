@@ -104,6 +104,31 @@ export interface Sample {
   url?: string;
 }
 
+export interface MachineModel {
+  id: string;
+  repo: string;
+  params: string;
+  size_gb: number;
+  train_vram_gb: number;
+  serve_vram_gb: number;
+  present: boolean;
+  active: boolean;
+  size_on_disk_gb: number;
+  fits_training: boolean;
+  fits_serving: boolean;
+  recommended: boolean;
+  download: { state: "running" | "done" | "error"; downloaded_gb: number; started: number } | null;
+}
+
+export interface Machine {
+  gpu: { name: string; vram_total_mb: number; vram_used_mb: number; util: number; temp_c: number; power_w: number } | null;
+  busy: string | null;
+  model_loaded: boolean;
+  base_model: string;
+  disk: { project_free_gb: number; project_total_gb: number; models_free_gb: number; models_total_gb: number };
+  models: MachineModel[];
+}
+
 export type Mode = "base" | "tuned" | "frontier";
 
 export interface GenRequest {
@@ -131,6 +156,8 @@ export interface Api {
   activateRun(id: string, run: string): Promise<{ active: string }>;
   excludePost(id: string, url: string, excluded: boolean): Promise<{ excluded: string[] }>;
   rerun(id: string, from: "collect" | "build" | "train" | "eval"): Promise<{ id: string }>;
+  getMachine(): Promise<Machine>;
+  downloadModel(id: string): Promise<{ id: string }>;
   generate(req: GenRequest, signal?: AbortSignal): AsyncGenerator<GenEvent>;
 }
 
@@ -198,6 +225,13 @@ const httpApi: Api = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ from }),
+    }),
+  getMachine: () => getJson<Machine>("/api/machine"),
+  downloadModel: (id) =>
+    getJson<{ id: string }>("/api/machine/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
     }),
 
   async *generate(req, signal) {

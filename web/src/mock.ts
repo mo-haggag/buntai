@@ -1,5 +1,5 @@
 // In-memory fake backend, used when the page is opened with ?mock=1.
-import type { Api, DataView, GenEvent, GenRequest, Run, Sample, Voice } from "./api";
+import type { Api, DataView, GenEvent, GenRequest, Machine, Run, Sample, Voice } from "./api";
 
 const sleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
@@ -264,6 +264,23 @@ export const mockApi: Api = {
     const sim = sims.find((s) => s.id === id);
     if (sim) sim.startedAt = Date.now();
     else sims.push({ id, name: allVoices().find((v) => v.id === id)?.name ?? id, source: "", startedAt: Date.now() });
+    return { id };
+  },
+  async getMachine(): Promise<Machine> {
+    await sleep(80);
+    return {
+      gpu: { name: "NVIDIA GeForce RTX 5090 Laptop GPU", vram_total_mb: 24463, vram_used_mb: 9343, util: 12, temp_c: 48, power_w: 41.2 },
+      busy: null, model_loaded: true, base_model: "qwen3vl-4b",
+      disk: { project_free_gb: 31.6, project_total_gb: 32.7, models_free_gb: 962, models_total_gb: 1700 },
+      models: [
+        { id: "qwen3vl-2b", repo: "Qwen/Qwen3-VL-2B-Instruct", params: "2B", size_gb: 4.4, train_vram_gb: 9, serve_vram_gb: 5, present: false, active: false, size_on_disk_gb: 0, fits_training: true, fits_serving: true, recommended: false, download: null },
+        { id: "qwen3vl-4b", repo: "Qwen/Qwen3-VL-4B-Instruct", params: "4B", size_gb: 8.9, train_vram_gb: 15, serve_vram_gb: 9, present: true, active: true, size_on_disk_gb: 8.9, fits_training: true, fits_serving: true, recommended: true, download: null },
+        { id: "qwen3vl-8b", repo: "Qwen/Qwen3-VL-8B-Instruct", params: "8B", size_gb: 17, train_vram_gb: 23, serve_vram_gb: 17, present: false, active: false, size_on_disk_gb: 0, fits_training: false, fits_serving: true, recommended: false, download: null },
+      ],
+    };
+  },
+  async downloadModel(id) {
+    await sleep(100);
     return { id };
   },
   async activateRun(id, run) {
