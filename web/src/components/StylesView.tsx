@@ -1,4 +1,4 @@
-import { ArrowRight, ChevronRight, FileText, UserRoundPlus, UsersRound } from "lucide-react";
+import { ArrowRight, ChevronRight, FileText, Plus, Signature } from "lucide-react";
 import type { Voice } from "../api";
 import { Button, EmptyState, PageHeader, Progress, StageBadge, cx, fmtCompact, hostOf, isRunning } from "./ui";
 
@@ -10,14 +10,14 @@ export function StylesView({ voices, loaded }: { voices: Voice[]; loaded: boolea
         sub="Each style is a small adapter on the same local model."
         actions={
           <Button variant="primary" onClick={() => (window.location.hash = "#/new")}>
-            <UserRoundPlus className="size-4" aria-hidden />
+            <Plus className="size-4" aria-hidden />
             New style
           </Button>
         }
       />
 
       {loaded && voices.length === 0 && (
-        <EmptyState icon={<UsersRound className="size-6" />} title="No styles yet">
+        <EmptyState icon={<Signature className="size-6" />} title="No styles yet">
           Add a blog, upload files or paste text to train one.
         </EmptyState>
       )}

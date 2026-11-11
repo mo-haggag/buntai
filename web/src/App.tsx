@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Activity, Cpu, Feather, House, Laptop, Monitor, Moon, Scale, SquarePen, Sun, UserRoundPlus, UsersRound } from "lucide-react";
+import { Activity, Cpu, Feather, Laptop, Monitor, Moon, Plus, Scale, Signature, SquarePen, Sun } from "lucide-react";
 import { api, isMock } from "./api";
 import type { Voice } from "./api";
 import { APP_NAME } from "./brand";
@@ -63,7 +63,6 @@ interface NavItem {
   href: string;
 }
 
-const START: NavItem = { section: "home", label: "Start", icon: <House className="size-4" aria-hidden />, href: "#/" };
 const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "Use",
@@ -72,14 +71,19 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "Train",
     items: [
-      { section: "new", label: "New style", icon: <UserRoundPlus className="size-4" aria-hidden />, href: "#/new" },
-      { section: "styles", label: "Styles", icon: <UsersRound className="size-4" aria-hidden />, href: "#/styles" },
-      { section: "activity", label: "Activity", icon: <Activity className="size-4" aria-hidden />, href: "#/activity" },
+      { section: "styles", label: "Styles", icon: <Signature className="size-4" aria-hidden />, href: "#/styles" },
       { section: "benchmark", label: "Benchmark", icon: <Scale className="size-4" aria-hidden />, href: "#/benchmark" },
+    ],
+  },
+  {
+    title: "System",
+    items: [
+      { section: "activity", label: "Activity", icon: <Activity className="size-4" aria-hidden />, href: "#/activity" },
       { section: "machine", label: "Machine", icon: <Cpu className="size-4" aria-hidden />, href: "#/machine" },
     ],
   },
 ];
+const NEW: NavItem = { section: "new", label: "New style", icon: <Plus className="size-4" aria-hidden />, href: "#/new" };
 
 export default function App() {
   const route = useRoute();
@@ -147,14 +151,23 @@ export default function App() {
     <div className="min-h-screen md:grid md:grid-cols-[var(--rail-width)_1fr]">
       {/* Side menu */}
       <aside className="sticky top-0 hidden h-screen flex-col gap-6 border-r border-line bg-surface px-3 py-4 md:flex">
-        <a href="#/" className="flex items-center gap-2.5 px-2">
+        <a href="#/" title="Start" className="flex items-center gap-2.5 rounded-(--radius-control) px-2 py-1 hover:bg-sunken">
           <span className="flex size-8 items-center justify-center rounded-(--radius-control) bg-accent text-white">
             <Feather className="size-4" aria-hidden />
           </span>
           <span className="font-semibold tracking-tight">{APP_NAME}</span>
         </a>
+        <a
+          href={NEW.href}
+          className={cx(
+            "flex h-9 items-center justify-center gap-2 rounded-(--radius-control) text-sm font-medium transition-colors",
+            route.section === "new" ? "bg-accent-hover text-white" : "bg-accent text-white hover:bg-accent-hover",
+          )}
+        >
+          {NEW.icon}
+          {NEW.label}
+        </a>
         <nav className="flex flex-col gap-5">
-          <div className="flex flex-col gap-0.5">{link(START)}</div>
           {GROUPS.map((g) => (
             <div key={g.title} className="flex flex-col gap-0.5">
               <div className="px-3 pb-1 text-[11px] font-semibold tracking-wider text-ink-3 uppercase">{g.title}</div>
@@ -186,7 +199,7 @@ export default function App() {
           <Feather className="size-4" aria-hidden />
         </span>
         <span className="font-semibold">{APP_NAME}</span>
-        <div className="ml-auto flex gap-1">{[START, ...GROUPS.flatMap((g) => g.items)].map((n) => link(n, true))}</div>
+        <div className="ml-auto flex gap-1">{[NEW, ...GROUPS.flatMap((g) => g.items)].map((n) => link(n, true))}</div>
       </header>
 
       <main className="min-w-0 px-4 py-6 sm:px-8 sm:py-8">

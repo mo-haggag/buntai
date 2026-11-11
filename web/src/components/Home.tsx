@@ -1,4 +1,4 @@
-import { ArrowRight, Cpu, SquarePen, UserRoundPlus, UsersRound } from "lucide-react";
+import { ArrowRight, Cpu, Plus, Signature, SquarePen } from "lucide-react";
 import type { ReactNode } from "react";
 import type { Voice } from "../api";
 import { APP_NAME } from "../brand";
@@ -26,7 +26,7 @@ export function Home({ voices, busy }: { voices: Voice[]; busy: string | null })
       <div className="grid gap-4 sm:grid-cols-3">
         <Choice
           href="#/new"
-          icon={<UserRoundPlus className="size-5" aria-hidden />}
+          icon={<Plus className="size-5" aria-hidden />}
           title="Train a style"
           sub="From a blog, files or pasted text. About ten minutes."
           primary={ready.length === 0}
@@ -53,7 +53,7 @@ export function Home({ voices, busy }: { voices: Voice[]; busy: string | null })
             <section className="space-y-3">
               <div className="flex items-center justify-between">
                 <h2 className="flex items-center gap-2 font-semibold">
-                  <UsersRound className="size-4 text-ink-2" aria-hidden />
+                  <Signature className="size-4 text-ink-2" aria-hidden />
                   Styles
                 </h2>
                 <a href="#/styles" className="text-sm text-ink-2 hover:text-ink">
