@@ -25,14 +25,26 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def fetch(url: str, timeout: int = 30) -> str:
+    """The page as text, decoded with the charset the server or the page declares (old sites are Windows-1252)."""
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     with urllib.request.urlopen(req, timeout=timeout) as r:
-        return r.read().decode("utf-8", errors="replace")
+        raw = r.read()
+        charset = r.headers.get_content_charset()
+    if not charset:
+        m = re.search(rb'(?i)<meta[^>]+charset=["\']?\s*([a-z0-9_-]+)', raw[:4096])
+        charset = m.group(1).decode() if m else None
+    for enc in ([charset] if charset else []) + ["utf-8", "cp1252"]:
+        try:
+            return raw.decode(enc)
+        except (UnicodeDecodeError, LookupError):
+            continue
+    return raw.decode("utf-8", errors="replace")
 
 
 def strip_tags(fragment: str) -> str:
     """HTML fragment to plain text with paragraph breaks kept."""
-    s = re.sub(r"(?is)<(script|style|figure|iframe|noscript).*?</\1>", "", fragment)
+    s = re.sub(r"(?s)<!--.*?-->", "", fragment)
+    s = re.sub(r"(?is)<(script|style|figure|iframe|noscript).*?</\1>", "", s)
     s = re.sub(r"(?i)<br\s*/?>", "\n", s)
     s = re.sub(r"(?i)</(p|div|h[1-6]|li|blockquote|tr)>", "\n\n", s)
     s = re.sub(r"(?i)<li[^>]*>", "- ", s)
@@ -78,18 +90,20 @@ def extract_post(page: str) -> dict:
     paras = text.split("\n\n")
     while paras and len(paras[0].split()) < 12:  # subtitles, bylines, dates, share counts above the first sentence
         paras.pop(0)
+    while paras and len(paras[-1].split()) < 8:  # translation links, "Related:", share buttons below the last sentence
+        paras.pop()
     return {"title": title, "date": date.group(1) if date else "", "text": "\n\n".join(paras)}
 
 
 def post_links(page: str, base: str) -> list[str]:
-    host = urlparse(base).netloc
+    """Same-host, single-segment links, on the base URL's scheme (so http and https links are one post)."""
+    b = urlparse(base)
     out = []
     for href in re.findall(r'href="([^"#?]+)"', page):
-        u = urljoin(base, href)
-        p = urlparse(u)
+        p = urlparse(urljoin(base, href))
         path = p.path.strip("/")
-        if p.netloc == host and path and "/" not in path and not re.search(r"\.(atom|rss|xml|css|js|png|jpg)$", path):
-            out.append(u.rstrip("/"))
+        if p.netloc == b.netloc and path and "/" not in path and not re.search(r"\.(atom|rss|xml|css|js|png|jpg)$", path):
+            out.append(p._replace(scheme=b.scheme).geturl().rstrip("/"))
     return out
 
 
@@ -233,7 +247,9 @@ def read_files(folder: Path) -> list[dict]:
             print("skip %s: unsupported type" % f.name, file=sys.stderr)
             continue
         text = text.replace("\r\n", "\n")
+        # Pieces split at # headings (markdown) or at a line of --- (pasted text, any type).
         sections = re.split(r"(?m)^#{1,2} +", text) if ext in (".md", ".markdown") else [text]
+        sections = [part for sec in sections for part in re.split(r"(?m)^\s*-{3,}\s*$", sec)]
         for i, sec in enumerate(sections):
             body = re.sub(r"\n{3,}", "\n\n", sec.strip())
             if len(body.split()) < 80:

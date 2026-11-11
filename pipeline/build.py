@@ -18,6 +18,7 @@ import argparse
 import hashlib
 import json
 import os
+import random
 import re
 import sys
 import time
@@ -69,6 +70,25 @@ def passages(text: str, lo: int = 120, hi: int = 380) -> list[str]:
     return out
 
 
+def clean(text: str) -> str:
+    """Residue a crawl can leave in a passage: HTML comment markers and stray tokens."""
+    return re.sub(r"[ \t]*(<!--|-->)[ \t]*", " ", text).replace("  ", " ").strip()
+
+
+def dedupe(posts: list[dict]) -> list[dict]:
+    """One copy per post: the same page linked as http and https, or the same text under two URLs."""
+    seen: set[str] = set()
+    out = []
+    for p in posts:
+        key_url = re.sub(r"^https?://", "", p["url"]).rstrip("/")
+        key_text = hashlib.sha1(p["text"][:2000].encode()).hexdigest()
+        if key_url in seen or key_text in seen:
+            continue
+        seen.update((key_url, key_text))
+        out.append(p)
+    return out
+
+
 def in_eval(url: str, frac: float) -> bool:
     return int(hashlib.sha1(url.encode()).hexdigest(), 16) % 1000 < frac * 1000
 
@@ -101,20 +121,32 @@ def main() -> None:
     ap.add_argument("--model", default="gpt-5.4-mini")
     ap.add_argument("--eval-frac", type=float, default=0.08)
     ap.add_argument("--workers", type=int, default=24)
-    ap.add_argument("--limit", type=int, default=0, help="cap on passages, 0 = all")
+    ap.add_argument("--max-passages", type=int, default=600,
+                    help="a large corpus is sampled down to this many passages so a run stays minutes long")
     a = ap.parse_args()
 
-    posts = [json.loads(l) for l in open(ROOT / "data" / "corpus" / a.voice / "posts.jsonl")]
-    kept = [p for p in posts if not is_transcript(p)]
+    run = ROOT / "runs" / a.voice
+    run.mkdir(parents=True, exist_ok=True)
+    posts = dedupe([json.loads(l) for l in open(ROOT / "data" / "corpus" / a.voice / "posts.jsonl")])
+    excluded_file = run / "excluded.json"
+    excluded = set(json.loads(excluded_file.read_text())) if excluded_file.exists() else set()
+    dropped = [{"title": p["title"], "url": p["url"], "words": len(p["text"].split()),
+                "why": "excluded by you" if p["url"] in excluded else "interview or transcript"}
+               for p in posts if p["url"] in excluded or is_transcript(p)]
+    kept = [p for p in posts if p["url"] not in excluded and not is_transcript(p)]
     items = []
     for p in kept:
         split = "eval" if in_eval(p["url"], a.eval_frac) else "train"
-        for i, psg in enumerate(passages(p["text"])):
+        for i, psg in enumerate(passages(clean(p["text"]))):
+            if "\ufffd" in psg:  # undecodable characters from the crawl: not the author's text
+                continue
             items.append({"split": split, "url": p["url"], "title": p["title"], "i": i, "passage": psg})
-    if a.limit:
-        items = items[: a.limit]
-    print("posts %d, kept %d (dropped %d transcripts), passages %d" % (
-        len(posts), len(kept), len(posts) - len(kept), len(items)), file=sys.stderr)
+    total_passages = len(items)
+    if a.max_passages and len(items) > a.max_passages:
+        random.Random(0).shuffle(items)
+        items = items[: a.max_passages]
+    print("posts %d, kept %d (dropped %d), passages %d of %d" % (
+        len(posts), len(kept), len(dropped), len(items), total_passages), file=sys.stderr)
 
     done = [0]
 
@@ -160,13 +192,11 @@ def main() -> None:
     stats = {
         "voice": a.voice, "posts": len(posts), "posts_kept": len(kept),
         "kept_posts": [{"title": p["title"], "url": p["url"], "words": len(p["text"].split())} for p in kept],
-        "dropped_posts": [{"title": p["title"], "url": p["url"], "words": len(p["text"].split())} for p in posts if is_transcript(p)],
-        "passages": len(built), "train": counts["train"], "eval": counts["eval"],
+        "dropped_posts": dropped,
+        "passages": len(built), "passages_total": total_passages, "train": counts["train"], "eval": counts["eval"],
         "train_words": sum(len(it["passage"].split()) for it in built if it["split"] == "train"),
         "instruction_model": a.model,
     }
-    run = ROOT / "runs" / a.voice
-    run.mkdir(parents=True, exist_ok=True)
     (run / "build.json").write_text(json.dumps(stats, indent=1))
     print(json.dumps(stats))
 

@@ -1,31 +1,39 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { BookOpenText, CircleAlert, Feather, Laptop, Monitor, Moon, PenLine, Scale, Sun } from "lucide-react";
+import { BookOpenText, Feather, Laptop, Monitor, Moon, PenLine, Plus, Sun } from "lucide-react";
 import { api, isMock } from "./api";
 import type { Voice } from "./api";
+import { APP_NAME, APP_TAGLINE } from "./brand";
 import { useTheme } from "./theme";
 import type { ThemePref } from "./theme";
-import { BlindTest } from "./components/BlindTest";
-import { VoiceDetail } from "./components/VoiceDetail";
-import { VoicesView } from "./components/VoicesView";
+import { NewStyle } from "./components/NewStyle";
+import { StyleDetail } from "./components/StyleDetail";
+import type { DetailTab } from "./components/StyleDetail";
+import { StylesView } from "./components/StylesView";
 import { WriteView } from "./components/WriteView";
-import { cx, isRunning } from "./components/ui";
+import { ErrorNote, cx, isRunning } from "./components/ui";
 
-type Tab = "voices" | "write" | "blind";
+type Section = "write" | "styles" | "new";
 interface Route {
-  tab: Tab;
+  section: Section;
   id?: string;
+  tab?: DetailTab;
 }
+
+const TABS: DetailTab[] = ["overview", "data", "training", "evaluation"];
 
 function parseHash(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
-  if (parts[0] === "write") return { tab: "write" };
-  if (parts[0] === "blind") return { tab: "blind" };
-  if (parts[0] === "voices" && parts[1]) return { tab: "voices", id: decodeURIComponent(parts[1]) };
-  return { tab: "voices" };
+  if (parts[0] === "write") return { section: "write" };
+  if (parts[0] === "new") return { section: "new" };
+  if (parts[0] === "styles" && parts[1]) {
+    const tab = TABS.includes(parts[2] as DetailTab) ? (parts[2] as DetailTab) : "overview";
+    return { section: "styles", id: decodeURIComponent(parts[1]), tab };
+  }
+  return { section: "styles" };
 }
 
-const go = (path: string) => {
+export const go = (path: string) => {
   window.location.hash = `#/${path}`;
   window.scrollTo(0, 0);
 };
@@ -40,10 +48,10 @@ function useRoute() {
   return route;
 }
 
-const TABS: { tab: Tab; label: string; icon: ReactNode }[] = [
-  { tab: "voices", label: "Voices", icon: <BookOpenText className="size-4" aria-hidden /> },
-  { tab: "write", label: "Write", icon: <PenLine className="size-4" aria-hidden /> },
-  { tab: "blind", label: "Blind test", icon: <Scale className="size-4" aria-hidden /> },
+const NAV: { section: Section; label: string; icon: ReactNode; href: string }[] = [
+  { section: "write", label: "Write", icon: <PenLine className="size-4" aria-hidden />, href: "#/write" },
+  { section: "styles", label: "Styles", icon: <BookOpenText className="size-4" aria-hidden />, href: "#/styles" },
+  { section: "new", label: "New style", icon: <Plus className="size-4" aria-hidden />, href: "#/new" },
 ];
 
 export default function App() {
@@ -52,11 +60,11 @@ export default function App() {
   const [voices, setVoices] = useState<Voice[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
-  const [visited, setVisited] = useState<Set<Tab>>(() => new Set([route.tab]));
+  const [writeMounted, setWriteMounted] = useState(route.section === "write");
 
   useEffect(() => {
-    setVisited((s) => (s.has(route.tab) ? s : new Set(s).add(route.tab)));
-  }, [route.tab]);
+    if (route.section === "write") setWriteMounted(true);
+  }, [route.section]);
 
   const refresh = useCallback(async () => {
     try {
@@ -69,106 +77,124 @@ export default function App() {
   }, []);
 
   const anyRunning = voices.some(isRunning);
-  const onList = route.tab === "voices" && !route.id;
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
   useEffect(() => {
-    const t = setInterval(refresh, anyRunning && onList ? 2000 : 10000);
+    const t = setInterval(refresh, anyRunning ? 3000 : 15000);
     return () => clearInterval(t);
-  }, [refresh, anyRunning, onList]);
+  }, [refresh, anyRunning]);
 
   const upsert = useCallback((v: Voice) => {
     setVoices((prev) => (prev.some((x) => x.id === v.id) ? prev.map((x) => (x.id === v.id ? v : x)) : [...prev, v]));
   }, []);
 
+  const nav = (
+    <nav className="flex flex-col gap-0.5">
+      {NAV.map((n) => (
+        <a
+          key={n.section}
+          href={n.href}
+          className={cx(
+            "flex h-9 items-center gap-2.5 rounded-(--radius-control) px-3 text-sm font-medium transition-colors",
+            route.section === n.section ? "bg-sunken text-ink" : "text-ink-2 hover:bg-sunken hover:text-ink",
+          )}
+        >
+          {n.icon}
+          {n.label}
+        </a>
+      ))}
+    </nav>
+  );
+
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-20 border-b border-line bg-surface/85 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-4 sm:px-6">
-          <a href="#/voices" className="flex items-center gap-2 font-semibold tracking-tight">
-            <span className="flex size-7 items-center justify-center rounded-lg bg-accent text-white">
-              <Feather className="size-4" aria-hidden />
+    <div className="min-h-screen md:grid md:grid-cols-[var(--rail-width)_1fr]">
+      {/* Side menu */}
+      <aside className="sticky top-0 hidden h-screen flex-col gap-6 border-r border-line bg-surface px-3 py-4 md:flex">
+        <a href="#/styles" className="flex items-center gap-2.5 px-2">
+          <span className="flex size-8 items-center justify-center rounded-(--radius-control) bg-accent text-white">
+            <Feather className="size-4" aria-hidden />
+          </span>
+          <span className="leading-tight">
+            <span className="block font-semibold tracking-tight">{APP_NAME}</span>
+            <span className="block text-[11px] text-ink-3">{APP_TAGLINE}</span>
+          </span>
+        </a>
+        {nav}
+        <div className="mt-auto space-y-3 px-1">
+          {isMock && (
+            <span className="inline-block rounded-full border border-line-strong px-2 py-0.5 text-xs font-medium text-ink-3">
+              Mock data
             </span>
-            ownvoice
-          </a>
-          <nav className="flex items-center gap-1">
-            {TABS.map((t) => (
-              <a
-                key={t.tab}
-                href={`#/${t.tab}`}
-                className={cx(
-                  "inline-flex h-8 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors",
-                  route.tab === t.tab ? "bg-sunken text-ink" : "text-ink-2 hover:bg-sunken hover:text-ink",
-                )}
-              >
-                {t.icon}
-                <span className="hidden sm:inline">{t.label}</span>
-              </a>
-            ))}
-          </nav>
-          <div className="ml-auto flex items-center gap-3">
-            {isMock && (
-              <span className="rounded-full border border-line-strong px-2 py-0.5 text-xs font-medium text-ink-3">
-                Mock data
-              </span>
-            )}
-            <span className="hidden items-center gap-1.5 rounded-full bg-sunken px-2.5 py-1 text-xs text-ink-2 md:inline-flex">
-              <Laptop className="size-3.5" aria-hidden />
-              Runs on your laptop · no data leaves it
-            </span>
-            <ThemeSwitch value={theme} onChange={setTheme} />
+          )}
+          <div className="flex items-center gap-1.5 text-xs text-ink-3">
+            <Laptop className="size-3.5 shrink-0" aria-hidden />
+            Runs on your laptop. No data leaves it.
           </div>
+          <ThemeSwitch value={theme} onChange={setTheme} />
+        </div>
+      </aside>
+
+      {/* Small screens: a top bar instead of the rail */}
+      <header className="sticky top-0 z-20 flex h-12 items-center gap-3 border-b border-line bg-surface px-3 md:hidden">
+        <span className="flex size-7 items-center justify-center rounded-(--radius-control) bg-accent text-white">
+          <Feather className="size-4" aria-hidden />
+        </span>
+        <span className="font-semibold">{APP_NAME}</span>
+        <div className="ml-auto flex gap-1">
+          {NAV.map((n) => (
+            <a
+              key={n.section}
+              href={n.href}
+              title={n.label}
+              aria-label={n.label}
+              className={cx(
+                "flex size-8 items-center justify-center rounded-(--radius-control)",
+                route.section === n.section ? "bg-sunken text-ink" : "text-ink-2",
+              )}
+            >
+              {n.icon}
+            </a>
+          ))}
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-        {listError && (
-          <div className="mb-6 flex items-center gap-2 rounded-xl border border-bad/30 bg-bad-soft px-4 py-3 text-sm text-bad">
-            <CircleAlert className="size-4 shrink-0" aria-hidden />
-            <span className="flex-1">Server not reachable ({listError})</span>
-            <button className="font-medium underline" onClick={refresh}>
-              Retry
-            </button>
-          </div>
-        )}
+      <main className="min-w-0 px-4 py-6 sm:px-8 sm:py-8">
+        <div className="mx-auto max-w-6xl space-y-6">
+          {listError && <ErrorNote onRetry={refresh}>Server not reachable ({listError})</ErrorNote>}
 
-        {route.tab === "voices" &&
-          (route.id ? (
-            <VoiceDetail
-              key={route.id}
-              id={route.id}
-              voice={voices.find((v) => v.id === route.id)}
-              onUpdate={upsert}
-              onBack={() => go("voices")}
-              onWrite={() => go("write")}
-              onBlind={() => go("blind")}
-            />
-          ) : (
-            <VoicesView
-              voices={voices}
-              loaded={loaded}
-              onOpen={(id) => go(`voices/${encodeURIComponent(id)}`)}
+          {route.section === "styles" &&
+            (route.id ? (
+              <StyleDetail
+                key={route.id}
+                id={route.id}
+                tab={route.tab ?? "overview"}
+                voice={voices.find((v) => v.id === route.id)}
+                onUpdate={upsert}
+                onTab={(t) => go(`styles/${encodeURIComponent(route.id!)}/${t}`)}
+              />
+            ) : (
+              <StylesView voices={voices} loaded={loaded} />
+            ))}
+
+          {route.section === "new" && (
+            <NewStyle
               onCreated={(id) => {
                 refresh();
-                go(`voices/${encodeURIComponent(id)}`);
+                go(`styles/${encodeURIComponent(id)}`);
               }}
             />
-          ))}
+          )}
 
-        {/* Write and Blind test stay mounted once opened so their state survives tab switches. */}
-        {visited.has("write") && (
-          <div hidden={route.tab !== "write"}>
-            <WriteView voices={voices} onGoVoices={() => go("voices")} />
-          </div>
-        )}
-        {visited.has("blind") && (
-          <div hidden={route.tab !== "blind"}>
-            <BlindTest voices={voices} onGoVoices={() => go("voices")} />
-          </div>
-        )}
+          {/* Write stays mounted once opened so its output survives a visit to another section. */}
+          {writeMounted && (
+            <div hidden={route.section !== "write"}>
+              <WriteView voices={voices} />
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );
@@ -181,7 +207,7 @@ function ThemeSwitch({ value, onChange }: { value: ThemePref; onChange: (v: Them
     { v: "dark", label: "Dark theme", icon: <Moon className="size-3.5" /> },
   ];
   return (
-    <div className="flex items-center rounded-lg border border-line p-0.5" role="radiogroup" aria-label="Theme">
+    <div className="inline-flex items-center rounded-(--radius-control) border border-line p-0.5" role="radiogroup" aria-label="Theme">
       {opts.map((o) => (
         <button
           key={o.v}

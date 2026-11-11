@@ -6,7 +6,7 @@ and picks the one whose voice is closest. Each sample is judged twice with diffe
 to cancel position bias.
 
 Usage: python pipeline/evaluate.py --voice garry --name "Garry Tan"
-Writes runs/<voice>/samples.json and adds "judge" to runs/<voice>/metrics.json.
+Writes samples.json into the voice's active run folder and adds "judge" to its metrics.json.
 """
 from __future__ import annotations
 
@@ -95,7 +95,9 @@ def main() -> None:
     ap.add_argument("--model-dir", default=str(ROOT / "models" / "qwen3vl-4b"))
     a = ap.parse_args()
 
-    run = ROOT / "runs" / a.voice
+    voice_dir = ROOT / "runs" / a.voice
+    active = json.loads((voice_dir / "active.json").read_text())["run"]
+    run = voice_dir / "runs" / active  # the active run: its adapter is judged, its folder gets the results
     held = [json.loads(l) for l in open(ROOT / "data" / "train" / a.voice / "eval.jsonl")]
     samples = pick(held, a.n)
 

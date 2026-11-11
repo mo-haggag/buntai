@@ -1,121 +1,52 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, CircleAlert, Quote, RotateCcw, Scale } from "lucide-react";
-import { api } from "../api";
+import { ArrowRight, Quote, RotateCcw } from "lucide-react";
 import type { Sample, Voice } from "../api";
-import { Button, Card, Dot, EmptyState, Paragraphs, Spinner, cx } from "./ui";
+import { BASE_MODEL } from "../brand";
+import { Button, Card, Dot, Paragraphs, cx } from "./ui";
 
 type Side = "tuned" | "base";
 
-export function BlindTest({ voices, onGoVoices }: { voices: Voice[]; onGoVoices: () => void }) {
-  const ready = voices.filter((v) => v.stage === "ready");
-  const [voiceId, setVoiceId] = useState("");
-  const [samples, setSamples] = useState<Sample[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+/** One held-out request at a time: the base model and the tuned style in random order; pick, then see the author's real passage. */
+export function BlindTest({ voice, samples }: { voice: Voice; samples: Sample[] }) {
   const [tunedIsA, setTunedIsA] = useState<boolean[]>([]);
   const [idx, setIdx] = useState(0);
   const [picks, setPicks] = useState<Side[]>([]);
 
-  useEffect(() => {
-    if (!ready.some((v) => v.id === voiceId) && ready.length) setVoiceId(ready[0].id);
-  }, [ready, voiceId]);
-
-  const load = (id: string) => {
-    setSamples(null);
-    setError(null);
+  const reset = () => {
+    setTunedIsA(samples.map(() => Math.random() < 0.5));
     setIdx(0);
     setPicks([]);
-    api
-      .getSamples(id)
-      .then((s) => {
-        setTunedIsA(s.map(() => Math.random() < 0.5));
-        setSamples(s);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   };
-
-  useEffect(() => {
-    if (voiceId) load(voiceId);
-  }, [voiceId]);
-
-  const voice = ready.find((v) => v.id === voiceId);
-
-  if (!ready.length) {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-xl font-semibold tracking-tight">Blind test</h1>
-        <EmptyState icon={<Scale className="size-6" />} title="No ready voices">
-          <Button className="mt-2" onClick={onGoVoices}>
-            Go to Voices
-          </Button>
-        </EmptyState>
-      </div>
-    );
-  }
+  useEffect(reset, [samples]);
 
   const tunedPicks = picks.filter((p) => p === "tuned").length;
-  const finished = samples !== null && samples.length > 0 && idx >= samples.length;
-  const sample = samples && idx < samples.length ? samples[idx] : null;
+  const finished = samples.length > 0 && idx >= samples.length;
+  const sample = idx < samples.length ? samples[idx] : null;
   const picked: Side | undefined = picks[idx];
 
   return (
-    <div className="space-y-6">
-      <div className="flex min-h-9 flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold tracking-tight">Blind test</h1>
-          {ready.length > 1 && (
-            <select
-              value={voiceId}
-              onChange={(e) => setVoiceId(e.target.value)}
-              className="h-9 rounded-lg border border-line-strong bg-surface px-2.5 text-sm font-medium text-ink focus:border-accent focus:outline-none"
-            >
-              {ready.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-        {picks.length > 0 && (
+    <div className="space-y-4">
+      {picks.length > 0 && (
+        <div className="flex justify-end">
           <div className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3.5 py-1.5 text-sm">
             <Dot tone="tuned" />
-            <span className="text-ink-2">You picked tuned</span>
+            <span className="text-ink-2">You picked the style</span>
             <span className="font-semibold tabular-nums">
               {tunedPicks} of {picks.length}
             </span>
           </div>
-        )}
-      </div>
-
-      {error && (
-        <div className="flex items-start gap-2 rounded-xl border border-bad/30 bg-bad-soft px-4 py-3 text-sm text-bad">
-          <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
-          <span className="flex-1">{error}</span>
-          <button className="font-medium underline" onClick={() => load(voiceId)}>
-            Retry
-          </button>
         </div>
-      )}
-
-      {!samples && !error && (
-        <div className="flex items-center gap-2 py-16 text-ink-3">
-          <Spinner /> Loading samples
-        </div>
-      )}
-
-      {samples && samples.length === 0 && (
-        <EmptyState icon={<Scale className="size-6" />} title="No held-out samples yet" />
       )}
 
       {finished && (
-        <Card className="flex flex-col items-center gap-2 px-6 py-14 text-center">
-          <div className="text-sm text-ink-2">You picked the tuned voice</div>
-          <div className="text-6xl font-semibold tracking-tight">
+        <Card className="flex flex-col items-center gap-2 px-6 py-12 text-center">
+          <div className="text-sm text-ink-2">You picked the trained style</div>
+          <div className="text-6xl font-semibold tracking-tight tabular-nums">
             {tunedPicks}
             <span className="text-ink-3"> / {picks.length}</span>
           </div>
-          <div className="text-sm text-ink-3">as more like {voice?.name}</div>
-          <Button className="mt-4" onClick={() => load(voiceId)}>
+          <div className="text-sm text-ink-3">as more like {voice.name}</div>
+          <Button className="mt-4" onClick={reset}>
             <RotateCcw className="size-4" aria-hidden />
             Start over
           </Button>
@@ -123,23 +54,19 @@ export function BlindTest({ voices, onGoVoices }: { voices: Voice[]; onGoVoices:
       )}
 
       {sample && (
-        <div className="space-y-5">
-          <Card className="p-5">
-            <div className="mb-1.5 flex items-center justify-between text-xs text-ink-3">
-              <span>Prompt</span>
+        <div className="space-y-4">
+          <Card className="p-4">
+            <div className="mb-1 flex items-center justify-between text-xs text-ink-3">
+              <span>Request</span>
               <span className="tabular-nums">
-                Sample {idx + 1} of {samples!.length}
+                {idx + 1} of {samples.length}
               </span>
             </div>
             <div className="text-[15px] font-medium leading-relaxed">{sample.instruction}</div>
           </Card>
 
           <div className="text-center text-sm font-medium text-ink-2">
-            {!picked
-              ? `Which sounds more like ${voice?.name}?`
-              : picked === "tuned"
-                ? "You picked the tuned voice"
-                : "You picked the base model"}
+            {!picked ? `Which sounds more like ${voice.name}?` : picked === "tuned" ? "You picked the trained style" : "You picked the base model"}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -166,10 +93,10 @@ export function BlindTest({ voices, onGoVoices }: { voices: Voice[]; onGoVoices:
           </div>
 
           {picked && (
-            <Card className="p-5">
+            <Card className="p-4">
               <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
                 <Quote className="size-4 text-ink-3" aria-hidden />
-                {voice?.name}'s real passage
+                {voice.name}'s real passage
               </div>
               <Paragraphs text={sample.reference} className="text-ink-2" />
             </Card>
@@ -178,7 +105,7 @@ export function BlindTest({ voices, onGoVoices }: { voices: Voice[]; onGoVoices:
           {picked && (
             <div className="flex justify-end">
               <Button variant="primary" onClick={() => setIdx((i) => i + 1)}>
-                {idx + 1 < samples!.length ? "Next" : "See score"}
+                {idx + 1 < samples.length ? "Next" : "See score"}
                 <ArrowRight className="size-4" aria-hidden />
               </Button>
             </div>
@@ -189,39 +116,16 @@ export function BlindTest({ voices, onGoVoices }: { voices: Voice[]; onGoVoices:
   );
 }
 
-function Option({
-  letter,
-  side,
-  text,
-  revealed,
-  chosen,
-  onPick,
-}: {
-  letter: "A" | "B";
-  side: Side;
-  text: string;
-  revealed: boolean;
-  chosen: boolean;
-  onPick: () => void;
-}) {
+function Option({ letter, side, text, revealed, chosen, onPick }: { letter: "A" | "B"; side: Side; text: string; revealed: boolean; chosen: boolean; onPick: () => void }) {
   return (
-    <Card
-      className={cx(
-        "flex flex-col transition-colors",
-        revealed && side === "tuned" && "border-tuned/60",
-        chosen && "ring-2 ring-accent",
-        !revealed && "hover:border-line-strong",
-      )}
-    >
+    <Card className={cx("flex flex-col transition-colors", revealed && side === "tuned" && "border-tuned/60", chosen && "ring-2 ring-accent", !revealed && "hover:border-line-strong")}>
       <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
         <div className="flex items-center gap-2.5">
-          <span className="flex size-7 items-center justify-center rounded-md bg-sunken text-sm font-semibold">
-            {letter}
-          </span>
+          <span className="flex size-7 items-center justify-center rounded-md bg-sunken text-sm font-semibold">{letter}</span>
           {revealed && (
             <span className="flex items-center gap-2 text-sm font-semibold">
               <Dot tone={side === "tuned" ? "tuned" : "stock"} />
-              {side === "tuned" ? "Tuned voice" : "Base Qwen3-VL-4B"}
+              {side === "tuned" ? "Trained style" : `Base ${BASE_MODEL}`}
             </span>
           )}
         </div>

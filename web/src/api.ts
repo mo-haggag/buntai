@@ -2,10 +2,53 @@ import { mockApi } from "./mock";
 
 export type Stage = "idle" | "collect" | "build" | "train" | "eval" | "ready" | "error";
 
+export interface Judge {
+  tuned_wins: number;
+  base_wins: number;
+  frontier_wins?: number;
+  n: number;
+  judge_model: string;
+  frontier_model?: string;
+}
+
+export interface Metrics {
+  ppl_base?: number;
+  ppl_tuned?: number;
+  ppl_by_epoch?: number[];
+  best_epoch?: number;
+  train_seconds?: number;
+  judge?: Judge;
+}
+
+export interface Run {
+  id: string;
+  created: number | null;
+  epochs?: number;
+  rank?: number;
+  lr?: number;
+  train_pairs?: number;
+  total_steps?: number;
+  has_adapter: boolean;
+  judged: boolean;
+  metrics: Metrics;
+}
+
+export interface Train {
+  run?: string;
+  steps: { step: number; loss: number }[];
+  epoch_ends?: { epoch: number; ppl: number; step: number }[];
+  total_steps: number;
+  epoch?: number;
+  epochs?: number;
+  seconds?: number;
+  best_epoch?: number;
+}
+
 export interface Voice {
   id: string;
   name: string;
   source: string;
+  source_kind?: "url" | "files";
   stage: Stage;
   progress?: { label: string; done: number; total: number };
   stats?: {
@@ -17,13 +60,37 @@ export interface Voice {
     eval?: number;
     train_words?: number;
   };
-  train?: { steps: { step: number; loss: number }[]; total_steps: number; epoch?: number; seconds?: number };
-  metrics?: {
-    ppl_base?: number;
-    ppl_tuned?: number;
-    judge?: { tuned_wins: number; base_wins: number; frontier_wins?: number; n: number; judge_model: string };
-  };
+  active_run?: string | null;
+  train?: Train;
+  metrics?: Metrics;
+  runs?: Run[];
   error?: string;
+}
+
+export interface PostRow {
+  title: string;
+  url: string;
+  words: number;
+  why?: string;
+}
+
+export interface Pair {
+  title: string;
+  url: string;
+  passage: string;
+  requests: string[];
+}
+
+export interface DataView {
+  kept_posts: PostRow[];
+  dropped_posts: PostRow[];
+  excluded?: string[];
+  passages?: number;
+  passages_total?: number;
+  train?: number;
+  eval?: number;
+  train_words?: number;
+  pairs: Pair[];
 }
 
 export interface Sample {
@@ -32,6 +99,9 @@ export interface Sample {
   base: string;
   tuned: string;
   frontier?: string;
+  votes?: (string | null)[];
+  title?: string;
+  url?: string;
 }
 
 export type Mode = "base" | "tuned" | "frontier";
@@ -43,16 +113,24 @@ export interface GenRequest {
   max_tokens?: number;
 }
 
-export type GenEvent =
-  | { t: string }
-  | { done: true; tokens?: number; tps?: number }
-  | { error: string };
+export type GenEvent = { t: string } | { done: true; tokens?: number; tps?: number } | { error: string };
+
+export interface NewVoice {
+  name: string;
+  source?: string;
+  text?: string;
+  files?: File[];
+}
 
 export interface Api {
   listVoices(): Promise<Voice[]>;
   getVoice(id: string): Promise<Voice>;
-  createVoice(name: string, source: string): Promise<{ id: string }>;
-  getSamples(id: string): Promise<Sample[]>;
+  createVoice(input: NewVoice): Promise<{ id: string }>;
+  getData(id: string): Promise<DataView>;
+  getSamples(id: string, run?: string): Promise<Sample[]>;
+  activateRun(id: string, run: string): Promise<{ active: string }>;
+  excludePost(id: string, url: string, excluded: boolean): Promise<{ excluded: string[] }>;
+  rerun(id: string, from: "collect" | "build" | "train" | "eval"): Promise<{ id: string }>;
   generate(req: GenRequest, signal?: AbortSignal): AsyncGenerator<GenEvent>;
 }
 
@@ -85,16 +163,42 @@ function parseEvent(line: string): GenEvent | null {
   }
 }
 
+const enc = encodeURIComponent;
+
 const httpApi: Api = {
   listVoices: () => getJson<Voice[]>("/api/voices"),
-  getVoice: (id) => getJson<Voice>(`/api/voices/${encodeURIComponent(id)}`),
-  createVoice: (name, source) =>
-    getJson<{ id: string }>("/api/voices", {
+  getVoice: (id) => getJson<Voice>(`/api/voices/${enc(id)}`),
+  createVoice: (input) => {
+    if (!input.text && !(input.files && input.files.length)) {
+      return getJson<{ id: string }>("/api/voices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: input.name, source: input.source ?? "" }),
+      });
+    }
+    const form = new FormData();
+    form.append("name", input.name);
+    if (input.source) form.append("source", input.source);
+    if (input.text) form.append("text", input.text);
+    for (const f of input.files ?? []) form.append("files", f, f.name);
+    return getJson<{ id: string }>("/api/voices", { method: "POST", body: form });
+  },
+  getData: (id) => getJson<DataView>(`/api/voices/${enc(id)}/data`),
+  getSamples: (id, run) => getJson<Sample[]>(`/api/voices/${enc(id)}/samples${run ? `?run=${enc(run)}` : ""}`),
+  activateRun: (id, run) =>
+    getJson<{ active: string }>(`/api/voices/${enc(id)}/runs/${enc(run)}/activate`, { method: "POST" }),
+  excludePost: (id, url, excluded) =>
+    getJson<{ excluded: string[] }>(`/api/voices/${enc(id)}/exclude`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, source }),
+      body: JSON.stringify({ url, excluded }),
     }),
-  getSamples: (id) => getJson<Sample[]>(`/api/voices/${encodeURIComponent(id)}/samples`),
+  rerun: (id, from) =>
+    getJson<{ id: string }>(`/api/voices/${enc(id)}/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ from }),
+    }),
 
   async *generate(req, signal) {
     const res = await fetch("/api/generate", {

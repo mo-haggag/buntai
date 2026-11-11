@@ -2,13 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { CircleAlert, PenLine, Sparkles, Square } from "lucide-react";
 import { api } from "../api";
 import type { Mode, Voice } from "../api";
-import { Button, Card, Dot, EmptyState, Paragraphs, Spinner, cx, fmtInt } from "./ui";
+import { BASE_MODEL, FRONTIER_LABEL } from "../brand";
+import { Button, Card, Dot, EmptyState, PageHeader, Paragraphs, Select, Spinner, Toggle, cx, fmtInt, textareaClass } from "./ui";
+import type { Tone } from "./ui";
 
 const EXAMPLES = [
   { label: "Talk to users weekly", prompt: "Write a short post on why founders should talk to users every week." },
   { label: "Default alive vs dead", prompt: "Explain default alive vs default dead to a first-time founder." },
   { label: "Cofounder wants to quit", prompt: "Give advice to a founder whose cofounder wants to quit." },
-  { label: "Demo day pitch", prompt: "Write a short post on what makes a great demo day pitch." },
+  { label: "AI and jobs", prompt: "Write a short post on what AI will do to jobs over the next ten years." },
 ];
 
 type ColStatus = "idle" | "queued" | "streaming" | "done" | "error" | "stopped";
@@ -19,19 +21,41 @@ interface Col {
   tps?: number;
   error?: string;
 }
+interface Column {
+  key: string;
+  voice: string;
+  mode: Mode;
+  title: string;
+  tone: Tone;
+}
 
 const EMPTY: Col = { status: "idle", text: "" };
-const tone: Record<Mode, "stock" | "tuned" | "frontier"> = { base: "stock", tuned: "tuned", frontier: "frontier" };
 
-export function WriteView({ voices, onGoVoices }: { voices: Voice[]; onGoVoices: () => void }) {
+function styleFromHash(): string {
+  const q = window.location.hash.split("?")[1];
+  return new URLSearchParams(q ?? "").get("style") ?? "";
+}
+
+export function WriteView({ voices }: { voices: Voice[] }) {
   const ready = voices.filter((v) => v.stage === "ready");
-  const [voiceId, setVoiceId] = useState<string>("");
+  const [voiceId, setVoiceId] = useState<string>(styleFromHash);
+  const [secondId, setSecondId] = useState<string>("");
   const [prompt, setPrompt] = useState("");
   const [frontier, setFrontier] = useState(false);
-  const [cols, setCols] = useState<Record<Mode, Col>>({ base: EMPTY, tuned: EMPTY, frontier: EMPTY });
+  const [showBase, setShowBase] = useState(true);
+  const [cols, setCols] = useState<Record<string, Col>>({});
   const [running, setRunning] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const onHash = () => {
+      const s = styleFromHash();
+      if (s) setVoiceId(s);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
 
   useEffect(() => {
     if (!ready.some((v) => v.id === voiceId) && ready.length) setVoiceId(ready[0].id);
@@ -40,40 +64,51 @@ export function WriteView({ voices, onGoVoices }: { voices: Voice[]; onGoVoices:
   useEffect(() => () => abortRef.current?.abort(), []);
 
   const voice = ready.find((v) => v.id === voiceId);
+  const second = ready.find((v) => v.id === secondId && v.id !== voiceId);
 
   if (!ready.length) {
     return (
       <div className="space-y-6">
-        <h1 className="text-xl font-semibold tracking-tight">Write</h1>
-        <EmptyState icon={<PenLine className="size-6" />} title="No ready voices">
-          <Button className="mt-2" onClick={onGoVoices}>
-            Go to Voices
+        <PageHeader title="Write" />
+        <EmptyState icon={<PenLine className="size-6" />} title="No trained styles yet">
+          <Button className="mt-2" onClick={() => (window.location.hash = "#/styles")}>
+            Go to Styles
           </Button>
         </EmptyState>
       </div>
     );
   }
 
-  const patch = (mode: Mode, p: Partial<Col> | ((c: Col) => Partial<Col>)) =>
-    setCols((prev) => ({ ...prev, [mode]: { ...prev[mode], ...(typeof p === "function" ? p(prev[mode]) : p) } }));
+  const columns: Column[] = [
+    ...(showBase ? [{ key: "base", voice: voiceId, mode: "base" as Mode, title: `Base ${BASE_MODEL}`, tone: "stock" as Tone }] : []),
+    { key: "a", voice: voiceId, mode: "tuned", title: `${voice?.name ?? "Style"} style`, tone: "tuned" },
+    ...(second ? [{ key: "b", voice: second.id, mode: "tuned" as Mode, title: `${second.name} style`, tone: "tuned" as Tone }] : []),
+    ...(frontier ? [{ key: "frontier", voice: voiceId, mode: "frontier" as Mode, title: FRONTIER_LABEL, tone: "frontier" as Tone }] : []),
+  ];
 
-  const runOne = async (mode: Mode, text: string, signal: AbortSignal) => {
-    patch(mode, { status: "queued", text: "", tokens: undefined, tps: undefined, error: undefined });
+  const patch = (key: string, p: Partial<Col> | ((c: Col) => Partial<Col>)) =>
+    setCols((prev) => {
+      const cur = prev[key] ?? EMPTY;
+      return { ...prev, [key]: { ...cur, ...(typeof p === "function" ? p(cur) : p) } };
+    });
+
+  const runOne = async (c: Column, text: string, signal: AbortSignal) => {
+    patch(c.key, { status: "queued", text: "", tokens: undefined, tps: undefined, error: undefined });
     try {
-      for await (const ev of api.generate({ voice: voiceId, prompt: text, mode }, signal)) {
-        if ("t" in ev) patch(mode, (c) => ({ status: "streaming", text: c.text + ev.t }));
+      for await (const ev of api.generate({ voice: c.voice, prompt: text, mode: c.mode, max_tokens: 400 }, signal)) {
+        if ("t" in ev) patch(c.key, (x) => ({ status: "streaming", text: x.text + ev.t }));
         else if ("error" in ev) {
-          patch(mode, { status: "error", error: ev.error });
+          patch(c.key, { status: "error", error: ev.error });
           return;
         } else if ("done" in ev) {
-          patch(mode, { status: "done", tokens: ev.tokens, tps: ev.tps });
+          patch(c.key, { status: "done", tokens: ev.tokens, tps: ev.tps });
           return;
         }
       }
-      patch(mode, { status: "done" });
+      patch(c.key, { status: "done" });
     } catch (err) {
-      if (signal.aborted) patch(mode, { status: "stopped" });
-      else patch(mode, { status: "error", error: err instanceof Error ? err.message : String(err) });
+      if (signal.aborted) patch(c.key, { status: "stopped" });
+      else patch(c.key, { status: "error", error: err instanceof Error ? err.message : String(err) });
     }
   };
 
@@ -83,42 +118,49 @@ export function WriteView({ voices, onGoVoices }: { voices: Voice[]; onGoVoices:
     const ctl = new AbortController();
     abortRef.current = ctl;
     setRunning(true);
-    const modes: Mode[] = frontier ? ["base", "tuned", "frontier"] : ["base", "tuned"];
-    if (!frontier) patch("frontier", EMPTY);
-    await Promise.all(modes.map((m) => runOne(m, text, ctl.signal)));
+    setCols({});
+    // Local columns share one GPU and queue on the server; the frontier call runs beside them.
+    await Promise.all(columns.map((c) => runOne(c, text, ctl.signal)));
     setRunning(false);
   };
 
   const stop = () => abortRef.current?.abort();
 
-  const shown: Mode[] = frontier ? ["base", "tuned", "frontier"] : ["base", "tuned"];
-  const title: Record<Mode, string> = {
-    base: "Base Qwen3-VL-4B",
-    tuned: `${voice?.name ?? "Tuned"} voice (tuned)`,
-    frontier: "GPT-5.5 imitating",
-  };
-
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold tracking-tight">Write</h1>
+      <PageHeader title="Write" sub="The same prompt, written by each model. Local styles run on this laptop." />
 
       <Card className="p-4 sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           <label className="flex items-center gap-2 text-sm">
-            <span className="text-ink-2">Voice</span>
-            <select
-              value={voiceId}
-              onChange={(e) => setVoiceId(e.target.value)}
-              className="h-9 rounded-lg border border-line-strong bg-surface px-2.5 text-sm font-medium text-ink focus:border-accent focus:outline-none"
-            >
+            <span className="text-ink-2">Style</span>
+            <Select value={voiceId} onChange={(e) => setVoiceId(e.target.value)}>
               {ready.map((v) => (
                 <option key={v.id} value={v.id}>
                   {v.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
-          <Toggle checked={frontier} onChange={setFrontier} label="GPT-5.5 imitating" disabled={running} />
+          {ready.length > 1 && (
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-ink-2">Compare with</span>
+              <Select value={second ? secondId : ""} onChange={(e) => setSecondId(e.target.value)}>
+                <option value="">None</option>
+                {ready
+                  .filter((v) => v.id !== voiceId)
+                  .map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                    </option>
+                  ))}
+              </Select>
+            </label>
+          )}
+          <div className="ml-auto flex flex-wrap items-center gap-5">
+            <Toggle checked={showBase} onChange={setShowBase} label="Base model" disabled={running} />
+            <Toggle checked={frontier} onChange={setFrontier} label={FRONTIER_LABEL} disabled={running} tone="frontier" />
+          </div>
         </div>
 
         <textarea
@@ -133,7 +175,7 @@ export function WriteView({ voices, onGoVoices }: { voices: Voice[]; onGoVoices:
           }}
           rows={3}
           placeholder="What should it write?"
-          className="mt-4 w-full resize-y rounded-lg border border-line-strong bg-surface px-3.5 py-3 text-[15px] leading-relaxed text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+          className={cx(textareaClass, "mt-4")}
         />
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
@@ -147,9 +189,7 @@ export function WriteView({ voices, onGoVoices }: { voices: Voice[]; onGoVoices:
                 }}
                 className={cx(
                   "h-8 rounded-full border px-3 text-sm transition-colors",
-                  prompt === ex.prompt
-                    ? "border-accent bg-accent-soft text-accent dark:text-accent-hover"
-                    : "border-line-strong text-ink-2 hover:bg-sunken hover:text-ink",
+                  prompt === ex.prompt ? "border-accent bg-accent-soft text-accent dark:text-accent-hover" : "border-line-strong text-ink-2 hover:bg-sunken hover:text-ink",
                 )}
               >
                 {ex.label}
@@ -170,22 +210,22 @@ export function WriteView({ voices, onGoVoices }: { voices: Voice[]; onGoVoices:
         </div>
       </Card>
 
-      <div className={cx("grid gap-4", shown.length === 3 ? "lg:grid-cols-3" : "md:grid-cols-2")}>
-        {shown.map((m) => (
-          <OutputColumn key={m} mode={m} title={title[m]} col={cols[m]} />
+      <div className={cx("grid gap-4", columns.length >= 4 ? "md:grid-cols-2 xl:grid-cols-4" : columns.length === 3 ? "lg:grid-cols-3" : "md:grid-cols-2")}>
+        {columns.map((c) => (
+          <OutputColumn key={c.key} column={c} col={cols[c.key] ?? EMPTY} />
         ))}
       </div>
     </div>
   );
 }
 
-function OutputColumn({ mode, title, col }: { mode: Mode; title: string; col: Col }) {
+function OutputColumn({ column, col }: { column: Column; col: Col }) {
   return (
-    <Card className={cx("flex min-h-72 flex-col", mode === "tuned" && "border-tuned/50 ring-1 ring-tuned/25")}>
+    <Card className={cx("flex min-h-72 flex-col", column.mode === "tuned" && "border-tuned/50 ring-1 ring-tuned/25")}>
       <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
-          <Dot tone={tone[mode]} />
-          <span className="truncate text-sm font-semibold">{title}</span>
+          <Dot tone={column.tone} />
+          <span className="truncate text-sm font-semibold">{column.title}</span>
         </div>
         {(col.status === "queued" || col.status === "streaming") && (
           <span className="flex shrink-0 items-center gap-1.5 text-xs text-ink-3">
@@ -208,52 +248,9 @@ function OutputColumn({ mode, title, col }: { mode: Mode; title: string; col: Co
         <div className="border-t border-line px-4 py-2.5 text-xs text-ink-3 tabular-nums">
           {col.status === "stopped"
             ? "Stopped"
-            : [
-                col.tokens !== undefined && `${fmtInt(col.tokens)} tokens`,
-                col.tps !== undefined && `${col.tps.toFixed(1)} tok/s`,
-              ]
-                .filter(Boolean)
-                .join(" · ") || "Done"}
+            : [col.tokens !== undefined && `${fmtInt(col.tokens)} tokens`, col.tps !== undefined && `${col.tps.toFixed(1)} tok/s`].filter(Boolean).join(" · ") || "Done"}
         </div>
       )}
     </Card>
-  );
-}
-
-function Toggle({
-  checked,
-  onChange,
-  label,
-  disabled,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className="inline-flex items-center gap-2.5 text-sm text-ink-2 hover:text-ink disabled:opacity-50"
-    >
-      <span
-        className={cx(
-          "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors",
-          checked ? "bg-frontier" : "bg-line-strong",
-        )}
-      >
-        <span
-          className={cx(
-            "inline-block size-4 rounded-full bg-white shadow-sm transition-transform",
-            checked ? "translate-x-[18px]" : "translate-x-0.5",
-          )}
-        />
-      </span>
-      {label}
-    </button>
   );
 }

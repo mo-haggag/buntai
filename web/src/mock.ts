@@ -1,5 +1,5 @@
 // In-memory fake backend, used when the page is opened with ?mock=1.
-import type { Api, GenEvent, GenRequest, Sample, Voice } from "./api";
+import type { Api, DataView, GenEvent, GenRequest, Run, Sample, Voice } from "./api";
 
 const sleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
@@ -26,18 +26,59 @@ function lossCurve(upTo: number, total: number, every = 3) {
   return steps;
 }
 
+const garryRuns: Run[] = [
+  {
+    id: "20261111-2040", created: Date.now() / 1000 - 600, epochs: 4, rank: 16, lr: 2e-4, train_pairs: 762,
+    total_steps: 384, has_adapter: true, judged: true,
+    metrics: { ppl_base: 18.9, ppl_tuned: 11.2, ppl_by_epoch: [12.4, 11.5, 11.2, 11.3], best_epoch: 3, train_seconds: 690,
+      judge: { tuned_wins: 26, base_wins: 0, frontier_wins: 14, n: 40, judge_model: "gpt-5.4", frontier_model: "gpt-5.5" } },
+  },
+  {
+    id: "20261111-1935", created: Date.now() / 1000 - 4200, epochs: 2, rank: 16, lr: 2e-4, train_pairs: 381,
+    total_steps: 96, has_adapter: true, judged: true,
+    metrics: { ppl_base: 19.2, ppl_tuned: 10.8, best_epoch: 2, train_seconds: 196,
+      judge: { tuned_wins: 27, base_wins: 0, frontier_wins: 13, n: 40, judge_model: "gpt-5.4", frontier_model: "gpt-5.5" } },
+  },
+];
+
 const garry: Voice = {
   id: "garry",
   name: "Garry Tan",
   source: "https://blog.garrytan.com",
+  source_kind: "url",
   stage: "ready",
-  stats: { posts: 412, words: 498_310, posts_kept: 377, passages: 2140, train: 1926, eval: 214, train_words: 431_900 },
-  train: { steps: lossCurve(360, 360), total_steps: 360, epoch: 3, seconds: 1412 },
-  metrics: {
-    ppl_base: 23.8,
-    ppl_tuned: 14.6,
-    judge: { tuned_wins: 21, base_wins: 3, frontier_wins: 6, n: 30, judge_model: "GPT-5.5" },
+  stats: { posts: 388, words: 161_461, posts_kept: 372, passages: 414, train: 762, eval: 33, train_words: 97_348 },
+  active_run: garryRuns[0].id,
+  train: {
+    run: garryRuns[0].id, steps: lossCurve(384, 384), total_steps: 384, epoch: 4, epochs: 4, seconds: 690, best_epoch: 3,
+    epoch_ends: [{ epoch: 1, ppl: 12.4, step: 96 }, { epoch: 2, ppl: 11.5, step: 192 }, { epoch: 3, ppl: 11.2, step: 288 }, { epoch: 4, ppl: 11.3, step: 384 }],
   },
+  metrics: garryRuns[0].metrics,
+  runs: garryRuns,
+};
+
+const data: DataView = {
+  kept_posts: [
+    { title: "Do things that don't scale, the Posterous edition", url: "https://blog.garrytan.com/a", words: 812 },
+    { title: "How founders can build trust and safety teams", url: "https://blog.garrytan.com/b", words: 640 },
+    { title: "Sell, die, no: grow profitably", url: "https://blog.garrytan.com/c", words: 1120 },
+  ],
+  dropped_posts: [{ title: "A conversation with Cameron Yarbrough of Torch", url: "https://blog.garrytan.com/d", words: 2210 }],
+  passages: 414,
+  train: 762,
+  eval: 33,
+  train_words: 97_348,
+  pairs: [
+    {
+      title: "Sell, die, no: grow profitably",
+      url: "https://blog.garrytan.com/c",
+      passage: "Picture this... You're burning more than a million dollars a month. You're growing great but your biggest competitor just had one of the worst IPOs of the year.\n\nWhat do you do? For many founders that means selling, going out of business, or recapping. Not for Ooshma though.",
+      requests: [
+        "Write a roughly 200-word piece about a meal-kit founder who faced a dangerous moment when the company was losing over a million dollars a month and a rival had a disastrous IPO, and chose to push to profitability instead of selling.",
+        "Write about a food startup founder turning a money-burning company profitable after a competitor's IPO collapse",
+      ],
+    },
+  ],
 };
 
 // Simulated pipeline for voices created in mock mode (and one already running).
@@ -57,7 +98,7 @@ const sims: Sim[] = [
 
 function simulate(sim: Sim): Voice {
   const t = Date.now() - sim.startedAt;
-  const v: Voice = { id: sim.id, name: sim.name, source: sim.source, stage: "collect" };
+  const v: Voice = { id: sim.id, name: sim.name, source: sim.source, source_kind: "url", stage: "collect", runs: [] };
   const posts = 186;
   const words = 214_560;
   if (t < DUR.collect) {
@@ -190,20 +231,48 @@ export const mockApi: Api = {
   async getVoice(id) {
     await sleep(80);
     const v = allVoices().find((x) => x.id === id);
-    if (!v) throw new Error("Voice not found");
+    if (!v) throw new Error("Style not found");
     return v;
   },
-  async createVoice(name, source) {
+  async createVoice(input) {
     await sleep(300);
-    let id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "voice";
+    let id = input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "voice";
     while (allVoices().some((v) => v.id === id)) id += "-2";
-    sims.push({ id, name, source, startedAt: Date.now() });
+    sims.push({ id, name: input.name, source: input.source || "uploaded files", startedAt: Date.now() });
     return { id };
+  },
+  async getData(id) {
+    await sleep(150);
+    if (!allVoices().some((v) => v.id === id)) throw new Error("Style not found");
+    return data;
   },
   async getSamples(id) {
     await sleep(200);
-    if (!allVoices().some((v) => v.id === id)) throw new Error("Voice not found");
+    if (!allVoices().some((v) => v.id === id)) throw new Error("Style not found");
     return samples;
+  },
+  async excludePost(_id, url, excluded) {
+    await sleep(80);
+    const set = new Set(data.excluded ?? []);
+    if (excluded) set.add(url);
+    else set.delete(url);
+    data.excluded = [...set];
+    return { excluded: data.excluded };
+  },
+  async rerun(id) {
+    await sleep(200);
+    const sim = sims.find((s) => s.id === id);
+    if (sim) sim.startedAt = Date.now();
+    else sims.push({ id, name: allVoices().find((v) => v.id === id)?.name ?? id, source: "", startedAt: Date.now() });
+    return { id };
+  },
+  async activateRun(id, run) {
+    await sleep(100);
+    if (id === "garry") {
+      garry.active_run = run;
+      garry.metrics = garryRuns.find((r) => r.id === run)?.metrics ?? garry.metrics;
+    }
+    return { active: run };
   },
   async *generate(req, signal) {
     if (req.mode === "frontier") {
