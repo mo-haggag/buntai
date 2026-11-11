@@ -58,7 +58,7 @@ await shot("4-write", "#/write", async () => {
   await click("[role=switch]", "GPT-5.5");
   await sleep(100);
   await click("button", "Generate");
-  await sleep(6500);
+  await sleep(Number(process.env.WRITE_WAIT || 6500));
 });
 await shot("5-blind", "#/blind", async () => {});
 await shot("6-blind-revealed", "#/blind", async () => {
