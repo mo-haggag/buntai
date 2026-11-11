@@ -300,6 +300,18 @@ export const mockApi: Api = {
       gpu_busy: live[0]?.id ?? null,
     };
   },
+  async deleteVoice(id) {
+    await sleep(150);
+    const i = sims.findIndex((s) => s.id === id);
+    if (i >= 0) sims.splice(i, 1);
+    return { deleted: id };
+  },
+  async deleteRun(_id, run) {
+    await sleep(100);
+    const i = garryRuns.findIndex((r) => r.id === run);
+    if (i >= 0) garryRuns.splice(i, 1);
+    return { deleted: run };
+  },
   async cancelJob(voice) {
     await sleep(100);
     const i = sims.findIndex((s) => s.id === voice);

@@ -188,7 +188,9 @@ export interface Api {
   getSamples(id: string, run?: string): Promise<Sample[]>;
   activateRun(id: string, run: string): Promise<{ active: string }>;
   excludePost(id: string, url: string, excluded: boolean): Promise<{ excluded: string[] }>;
-  rerun(id: string, from: "collect" | "build" | "train" | "eval", opts?: { continue?: boolean }): Promise<{ id: string }>;
+  rerun(id: string, from: "collect" | "build" | "train" | "eval", opts?: { continue?: boolean; checkpoints?: boolean }): Promise<{ id: string }>;
+  deleteVoice(id: string): Promise<{ deleted: string }>;
+  deleteRun(id: string, run: string): Promise<{ deleted: string }>;
   addWriting(id: string, input: Omit<NewVoice, "name">): Promise<{ id: string }>;
   getMachine(): Promise<Machine>;
   getJobs(): Promise<Jobs>;
@@ -260,8 +262,10 @@ const httpApi: Api = {
     getJson<{ id: string }>(`/api/voices/${enc(id)}/run`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ from, continue: !!opts?.continue }),
+      body: JSON.stringify({ from, continue: !!opts?.continue, checkpoints: !!opts?.checkpoints }),
     }),
+  deleteVoice: (id) => getJson<{ deleted: string }>(`/api/voices/${enc(id)}`, { method: "DELETE" }),
+  deleteRun: (id, run) => getJson<{ deleted: string }>(`/api/voices/${enc(id)}/runs/${enc(run)}`, { method: "DELETE" }),
   addWriting: (id, input) => {
     const form = new FormData();
     if (input.source) form.append("source", input.source);

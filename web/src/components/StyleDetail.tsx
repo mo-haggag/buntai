@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { ArrowDown, Check, CircleAlert, Download, Dumbbell, ExternalLink, EyeOff, FilePlus2, FileText, Gauge, Layers, Play, RefreshCw, SquarePen } from "lucide-react";
+import { ArrowDown, Check, CircleAlert, Download, Dumbbell, ExternalLink, EyeOff, FilePlus2, FileText, Gauge, Layers, Play, RefreshCw, SquarePen, Trash2 } from "lucide-react";
 import { api } from "../api";
 import type { DataView, Judge, Run, Sample, Voice } from "../api";
 import { BASE_MODEL, FRONTIER_LABEL } from "../brand";
@@ -88,7 +88,7 @@ export function StyleDetail({
   const tabs: { key: DetailTab; label: string; count?: number }[] = [
     { key: "overview", label: "Overview" },
     { key: "data", label: "Data", count: voice.stats?.posts },
-    { key: "training", label: "Training", count: runs.length || undefined },
+    { key: "training", label: "Training", count: runs.filter((r) => r.has_adapter || r.metrics.ppl_tuned !== undefined).length || undefined },
     { key: "evaluation", label: "Evaluation" },
   ];
 
@@ -110,12 +110,28 @@ export function StyleDetail({
           )
         }
         actions={
-          voice.stage === "ready" && (
-            <Button variant="primary" onClick={() => (window.location.hash = `#/write?style=${encodeURIComponent(voice.id)}`)}>
-              <SquarePen className="size-4" aria-hidden />
-              Write as {voice.name}
-            </Button>
-          )
+          <>
+            {["ready", "error", "idle"].includes(voice.stage) && (
+              <Button
+                variant="ghost"
+                title="Remove this style and everything made for it"
+                onClick={async () => {
+                  if (!window.confirm(`Delete ${voice.name}?\n\nThis removes the style, every run with its adapter and checkpoints, the collected writing and the training pairs. There is no undo.`)) return;
+                  await api.deleteVoice(voice.id);
+                  window.location.hash = "#/styles";
+                }}
+              >
+                <Trash2 className="size-4" aria-hidden />
+                Delete
+              </Button>
+            )}
+            {voice.stage === "ready" && (
+              <Button variant="primary" onClick={() => (window.location.hash = `#/write?style=${encodeURIComponent(voice.id)}`)}>
+                <SquarePen className="size-4" aria-hidden />
+                Write as {voice.name}
+              </Button>
+            )}
+          </>
         }
       />
 
@@ -404,10 +420,10 @@ function TrainingTab({ voice, onUpdate }: { voice: Voice; onUpdate: (v: Voice) =
 
   const minutes = Math.max(5, Math.round(((voice.metrics?.train_seconds ?? 600) + 300) / 60));
   const retrain = async () => {
-    if (!window.confirm(`Train ${voice.name} again from scratch on the same data?\n\nA new run, about ${minutes} minutes. The GPU is busy meanwhile, so writing pauses. The current adapter stays until the new run finishes and can be switched back to.`)) return;
+    if (!window.confirm(`Train ${voice.name} again from scratch on the same data?\n\nA new run of up to 4 epochs, then the judge tests every epoch against the author's real passages and keeps the one it prefers. About ${minutes + 12} minutes. The GPU is busy meanwhile, so writing pauses. The current adapter stays until the new run finishes and can be switched back to.`)) return;
     setBusy("retrain");
     try {
-      await api.rerun(voice.id, "train");
+      await api.rerun(voice.id, "train", { checkpoints: true });
       onUpdate(await api.getVoice(voice.id));
     } finally {
       setBusy(null);
@@ -469,7 +485,18 @@ function TrainingTab({ voice, onUpdate }: { voice: Voice; onUpdate: (v: Voice) =
         ) : (
           <Card className="divide-y divide-line">
             {runs.map((r) => (
-              <RunRow key={r.id} run={r} active={r.id === voice.active_run} busy={busy === r.id} onActivate={() => activate(r.id)} />
+              <RunRow
+                key={r.id}
+                run={r}
+                active={r.id === voice.active_run}
+                busy={busy === r.id}
+                onActivate={() => activate(r.id)}
+                onDelete={async () => {
+                  if (!window.confirm("Delete this run, its adapter and checkpoints? There is no undo.")) return;
+                  await api.deleteRun(voice.id, r.id);
+                  onUpdate(await api.getVoice(voice.id));
+                }}
+              />
             ))}
           </Card>
         )}
@@ -478,7 +505,7 @@ function TrainingTab({ voice, onUpdate }: { voice: Voice; onUpdate: (v: Voice) =
   );
 }
 
-function RunRow({ run: r, active, busy, onActivate }: { run: Run; active: boolean; busy: boolean; onActivate: () => void }) {
+function RunRow({ run: r, active, busy, onActivate, onDelete }: { run: Run; active: boolean; busy: boolean; onActivate: () => void; onDelete: () => void }) {
   const m = r.metrics;
   const drop = m.ppl_base && m.ppl_tuned ? ((m.ppl_base - m.ppl_tuned) / m.ppl_base) * 100 : null;
   return (
@@ -511,10 +538,15 @@ function RunRow({ run: r, active, busy, onActivate }: { run: Run; active: boolea
         <div className="text-xs text-ink-3">Judge</div>
         <div className="tabular-nums">{m.judge ? `${m.judge.tuned_wins} of ${m.judge.n}` : "not judged"}</div>
       </div>
-      <div className="sm:justify-self-end">
+      <div className="flex gap-1.5 sm:justify-self-end">
         {!active && r.has_adapter && (
           <Button onClick={onActivate} disabled={busy} className="h-8">
             {busy ? "Switching" : "Use this run"}
+          </Button>
+        )}
+        {!active && (
+          <Button variant="ghost" onClick={onDelete} disabled={busy} className="h-8 px-2" title="Delete this run" aria-label="Delete this run">
+            <Trash2 className="size-4" aria-hidden />
           </Button>
         )}
       </div>

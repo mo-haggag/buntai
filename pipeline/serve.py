@@ -417,6 +417,40 @@ async def create_voice(req: web.Request) -> web.Response:
     return web.json_response({"id": vid})
 
 
+@routes.delete("/api/voices/{id}")
+async def delete_voice(req: web.Request) -> web.Response:
+    """Remove a style and everything made for it: runs (adapters, checkpoints), collected writing, training pairs."""
+    import shutil
+    vid = req.match_info["id"]
+    v = load_voices()
+    if vid not in v:
+        raise web.HTTPNotFound()
+    if vid in running:
+        return web.json_response({"error": "a job is running for this style; cancel it first"}, status=409)
+    for p in (RUNS / vid, DATA / "corpus" / vid, DATA / "train" / vid):
+        shutil.rmtree(p, ignore_errors=True)
+    del v[vid]
+    save_voices(v)
+    log_job(voice=vid, stage="delete", event="end", ok=True, seconds=0)
+    return web.json_response({"deleted": vid})
+
+
+@routes.delete("/api/voices/{id}/runs/{rid}")
+async def delete_run(req: web.Request) -> web.Response:
+    """Remove one run (its adapter, checkpoints and results). The active run cannot be removed."""
+    import shutil
+    vid, rid = req.match_info["id"], req.match_info["rid"]
+    if vid in running:
+        return web.json_response({"error": "a job is running for this style"}, status=409)
+    if rid == active_run(vid):
+        return web.json_response({"error": "that run is active; switch to another run first"}, status=409)
+    d = run_dir(vid, rid)
+    if not d.exists():
+        raise web.HTTPNotFound()
+    shutil.rmtree(d, ignore_errors=True)
+    return web.json_response({"deleted": rid})
+
+
 @routes.post("/api/voices/{id}/run")
 async def rerun(req: web.Request) -> web.Response:
     """Run a voice's pipeline from a given step: {"from": "collect" | "build" | "train" | "eval"}."""
